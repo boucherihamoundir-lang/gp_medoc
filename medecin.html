@@ -550,7 +550,7 @@
                 @click="resendOtp" 
                 :class="authOtpTimer > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-sky-600 font-bold hover:underline'">
                 <span v-if="authOtpTimer > 0">Renvoyer dans {{ authOtpTimer }}s</span>
-                <span v-else>Renvoyer le code SMS</span>
+                <span v-else>check your sms</span>
               </button>
             </div>
           </div>
