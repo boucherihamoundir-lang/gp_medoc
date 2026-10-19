@@ -1,0 +1,140 @@
+/* styles.css - Styles personnalisés pour le Portail Médical Cabinet & Médecin */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Masquage immédiat des éléments avant compilation Vue */
+[v-cloak] {
+  display: none !important;
+}
+
+:root {
+  --primary-color: #0284c7; /* Sky 600 */
+  --primary-hover: #0369a1; /* Sky 700 */
+  --primary-light: #e0f2fe; /* Sky 100 */
+  --accent-color: #0d9488;  /* Teal 600 */
+}
+
+/* Thème Bleu Médical (Default) */
+body.theme-blue {
+  --primary-color: #0284c7;
+  --primary-hover: #0369a1;
+  --primary-light: #e0f2fe;
+  --primary-dark: #075985;
+}
+
+/* Thème Vert Émeraude Clinique */
+body.theme-emerald {
+  --primary-color: #059669;
+  --primary-hover: #047857;
+  --primary-light: #d1fae5;
+  --primary-dark: #065f46;
+}
+
+/* Thème Indigo Santé Digitale */
+body.theme-indigo {
+  --primary-color: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-light: #e0e7ff;
+  --primary-dark: #3730a3;
+}
+
+/* Thème Rose Soin & Pédiatrie */
+body.theme-rose {
+  --primary-color: #e11d48;
+  --primary-hover: #be123c;
+  --primary-light: #ffe4e6;
+  --primary-dark: #9f1239;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Pulse indicator for live consultation */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 0.3; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.pulse-badge {
+  animation: pulse-ring 2s infinite ease-in-out;
+}
+
+/* Chat bubble styling */
+.chat-bubble-patient {
+  border-bottom-left-radius: 4px;
+}
+
+.chat-bubble-doctor {
+  border-bottom-right-radius: 4px;
+}
+
+/* Auth & OTP Styles */
+.otp-input-field {
+  letter-spacing: 0.4em;
+  font-family: monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* Glassmorphism Auth Card */
+.glass-auth-card {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Print Stylesheet - Optimisé pour Ordonnance & Planning */
+@media print {
+  /* Masquer tout le dashboard sauf l'élément imprimable */
+  body * {
+    visibility: hidden;
+  }
+  
+  #printable-prescription, #printable-prescription * {
+    visibility: visible;
+  }
+  
+  #printable-prescription {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 2.5cm 2cm;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+

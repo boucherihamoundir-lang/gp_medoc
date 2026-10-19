@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEDOC - Espace Patient & Santé Connectée</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            medical: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <!-- Firebase Web SDK (Compat mode) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+</head>
+<body class="theme-blue bg-slate-50 text-slate-800 antialiased min-h-screen">
+
+<div id="patient-app" class="min-h-screen flex flex-col" v-cloak>
+
+  <!-- ==================== TOP NAVIGATION HEADER ==================== -->
+  <header class="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="flex items-center gap-3 group" title="Retour au portail d'accueil MEDOC">
+          <div class="w-11 h-11 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center p-1 shadow-md shadow-sky-500/10 border border-slate-200 dark:border-slate-700 overflow-hidden flex-shrink-0 group-hover:scale-105 transition-transform">
+            <img src="logo.png" alt="MEDOC" class="w-full h-full object-contain">
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-black text-xl tracking-wider text-blue-600 dark:text-blue-400">MEDOC</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-200 dark:border-emerald-800">
+                Espace Patient
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Services de Santé Innovants</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Quick Switch to Doctor Portal & Actions -->
+      <div class="flex items-center gap-2.5 sm:gap-3">
+        
+        <!-- Switch Button to Doctor Portal -->
+        <a 
+          href="medecin.html" 
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition border border-slate-200 dark:border-slate-700 shadow-sm">
+          <i class="fa-solid fa-user-doctor text-sky-600 dark:text-sky-400"></i>
+          <span class="hidden sm:inline">Espace Médecin</span>
+          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60"></i>
+        </a>
+
+        <!-- Dark Mode Toggle -->
+        <button 
+          @click="darkMode = !darkMode" 
+          class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          title="Basculer le mode sombre / clair">
+          <i :class="darkMode ? 'fa-solid fa-sun text-amber-400' : 'fa-solid fa-moon text-slate-600'"></i>
+        </button>
+
+        <!-- Patient Profile & Edit Profile Button (When Logged In) -->
+        <div v-if="isAuthenticated" class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+          
+          <button 
+            @click="openEditProfile"
+            class="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left group"
+            title="Modifier mes informations personnelles">
+            <img 
+              :src="patient.avatar" 
+              class="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/40">
+            <div class="hidden sm:block">
+              <div class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                <span>{{ patient.firstName ? (patient.civility + ' ' + patient.firstName + ' ' + patient.lastName) : 'Mon Dossier Patient' }}</span>
+                <i class="fa-solid fa-pen-to-square text-[10px] text-sky-600 opacity-0 group-hover:opacity-100 transition"></i>
+              </div>
+              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                {{ patient.wilaya }} • Sang : {{ patient.bloodGroup }}
+              </div>
+            </div>
+          </button>
+
+          <!-- Edit Profile Quick Pill Button -->
+          <button 
+            @click="openEditProfile" 
+            class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold transition"
+            title="Modifier mes informations personnelles">
+            <i class="fa-solid fa-user-pen text-xs"></i>
+            <span>Modifier Profil</span>
+          </button>
+
+          <!-- Logout Button -->
+          <button 
+            @click="logoutPatient" 
+            class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 flex items-center justify-center transition"
+            title="Se déconnecter">
+            <i class="fa-solid fa-power-off text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== AUTHENTIFICATION SCREEN (WHEN NOT LOGGED IN) ==================== -->
+  <div v-if="!isAuthenticated" class="flex-1 flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-100 via-sky-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-6">
+      
+      <!-- Card Header -->
+      <div class="bg-gradient-to-r from-teal-600 via-emerald-600 to-sky-700 p-6 text-white text-center relative overflow-hidden">
+        <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white p-1.5 shadow-lg flex items-center justify-center">
+          <img src="logo.png" alt="MEDOC" class="w-full h-full object-contain">
+        </div>
+        <h1 class="text-xl font-black">Espace Patient MEDOC</h1>
+        <p class="text-xs text-teal-100 mt-1 font-medium">Portail de santé personnel • 58 Wilayas d'Algérie 🇩🇿</p>
+        
+        <!-- 3-Way Mode Switcher -->
+        <div class="flex items-center justify-center gap-1.5 mt-4 bg-black/20 p-1 rounded-2xl text-xs font-bold">
+          <button 
+            @click="authMode = 'direct'"
+            :class="authMode === 'direct' ? 'bg-white text-emerald-700 shadow-md' : 'text-white/80 hover:text-white'"
+            class="flex-1 py-1.5 px-2 rounded-xl transition">
+            ✨ Entrée Directe
+          </button>
+          <button 
+            @click="authMode = 'signin'"
+            :class="authMode === 'signin' ? 'bg-white text-emerald-700 shadow-md' : 'text-white/80 hover:text-white'"
+            class="flex-1 py-1.5 px-2 rounded-xl transition">
+            🔑 Connexion
+          </button>
+          <button 
+            @click="authMode = 'signup'"
+            :class="authMode === 'signup' ? 'bg-white text-emerald-700 shadow-md' : 'text-white/80 hover:text-white'"
+            class="flex-1 py-1.5 px-2 rounded-xl transition">
+            ✍️ Inscription
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 sm:p-8">
+
+        <!-- ==================== OPTION 1: ENTRÉE DIRECTE SANS EXEMPLE NI MOT DE PASSE ==================== -->
+        <div v-if="authMode === 'direct'" class="space-y-4">
+          <div class="text-center">
+            <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">Démarrer avec votre propre profil</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saisissez simplement votre nom pour accéder à votre carnet vierge</p>
+          </div>
+
+          <form @submit.prevent="startDirectWithCleanProfile" class="space-y-3.5">
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Civilité</label>
+                <select v-model="directEntryForm.civility" class="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option value="M.">M.</option>
+                  <option value="Mme">Mme</option>
+                  <option value="Mlle">Mlle</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Prénom *</label>
+                <input type="text" v-model="directEntryForm.firstName" required placeholder="Votre prénom" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-slate-100">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Nom *</label>
+                <input type="text" v-model="directEntryForm.lastName" required placeholder="Votre nom" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold text-slate-900 dark:text-slate-100">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Wilaya de résidence</label>
+                <select v-model="directEntryForm.wilaya" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option v-for="w in algerianWilayas" :key="w.code" :value="w.name">
+                    {{ w.code }} · {{ w.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Groupe Sanguin</label>
+                <select v-model="directEntryForm.bloodGroup" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-rose-600">
+                  <option v-for="bg in bloodGroups" :key="bg" :value="bg">{{ bg }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Numéro de téléphone portable (optionnel)</label>
+              <div class="flex gap-2 items-center">
+                <div class="px-2.5 py-2 bg-green-50 dark:bg-green-950/40 border border-green-300 dark:border-green-700 rounded-xl font-bold text-xs text-green-800 dark:text-green-300 whitespace-nowrap">
+                  🇩🇿 +213
+                </div>
+                <input type="tel" v-model="directEntryForm.phone" placeholder="5XX XXX XXX" class="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+              <span>Accéder directement à mon Espace Patient</span>
+            </button>
+          </form>
+
+          <p class="text-[11px] text-slate-400 text-center pt-2">
+            Vous souhaitez protéger votre compte par mot de passe ? 
+            <button @click="authMode = 'signup'" class="text-sky-600 font-bold hover:underline">Créer un compte complet</button>
+          </p>
+        </div>
+
+        <!-- ==================== OPTION 2: CONNEXION PATIENT (EMAIL / SMS) ==================== -->
+        <div v-if="authMode === 'signin'" class="space-y-4">
+          <div class="text-center">
+            <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">Connexion à votre compte</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Retrouvez votre carnet de santé et vos rendez-vous</p>
+          </div>
+
+          <!-- Switcher Email vs SMS -->
+          <div class="flex items-center justify-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <button 
+              type="button" 
+              @click="authMethod = 'email'" 
+              :class="authMethod === 'email' ? 'bg-white dark:bg-slate-700 text-sky-700 dark:text-sky-300 shadow-sm font-bold' : 'text-slate-500 font-medium'"
+              class="flex-1 py-1.5 text-xs rounded-lg transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-envelope"></i>
+              <span>Email & Mot de passe</span>
+            </button>
+            <button 
+              type="button" 
+              @click="authMethod = 'phone'" 
+              :class="authMethod === 'phone' ? 'bg-white dark:bg-slate-700 text-sky-700 dark:text-sky-300 shadow-sm font-bold' : 'text-slate-500 font-medium'"
+              class="flex-1 py-1.5 text-xs rounded-lg transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-mobile-screen"></i>
+              <span>Téléphone SMS (+213)</span>
+            </button>
+          </div>
+
+          <!-- Connexion EMAIL -->
+          <form v-if="authMethod === 'email'" @submit.prevent="signInPatientWithEmail" class="space-y-3.5">
+            <div>
+              <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">✉️ Adresse Email</label>
+              <input type="email" v-model="authEmail" required placeholder="votre.email@exemple.dz" class="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">🔒 Mot de passe</label>
+              <input type="password" v-model="authPassword" required placeholder="••••••••" class="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+            </div>
+
+            <button 
+              type="submit" 
+              :disabled="authLoading || !authEmail || !authPassword"
+              class="w-full py-3 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-sky-500/20 hover:opacity-95 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              <i class="fa-solid fa-right-to-bracket" :class="authLoading ? 'animate-spin' : ''"></i>
+              <span>{{ authLoading ? 'Connexion en cours...' : 'Se connecter' }}</span>
+            </button>
+          </form>
+
+          <!-- Connexion TÉLÉPHONE SMS -->
+          <form v-else-if="authMethod === 'phone'" @submit.prevent="sendPatientOtp" class="space-y-3.5">
+            <div>
+              <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">📱 Numéro portable algérien</label>
+              <div class="flex gap-2 items-center">
+                <div class="px-3 py-2.5 bg-green-50 dark:bg-green-950/40 border border-green-300 dark:border-green-700 rounded-xl font-bold text-sm text-green-800 dark:text-green-300 whitespace-nowrap">
+                  🇩🇿 +213
+                </div>
+                <input type="tel" v-model="authPhone" placeholder="5XX XXX XXX" class="flex-1 px-3 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-semibold">
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              :disabled="authLoading || !authPhone || authPhone.length < 8"
+              class="w-full py-3 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-sky-500/20 hover:opacity-95 transition flex items-center justify-center gap-2 disabled:opacity-50">
+              <i class="fa-solid fa-paper-plane" :class="authLoading ? 'animate-spin' : ''"></i>
+              <span>{{ authLoading ? 'Envoi...' : 'Recevoir le Code SMS' }}</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- ==================== OPTION 3: INSCRIPTION NOUVEAU PATIENT ==================== -->
+        <div v-if="authMode === 'signup'" class="space-y-3.5">
+          <div class="text-center">
+            <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">Création de votre Dossier Médical</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Renseignez vos coordonnées réelles pour votre carnet</p>
+          </div>
+
+          <form @submit.prevent="signUpPatientWithEmail" class="space-y-3">
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Civilité</label>
+                <select v-model="signupForm.civility" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option value="M.">M.</option>
+                  <option value="Mme">Mme</option>
+                  <option value="Mlle">Mlle</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Prénom *</label>
+                <input type="text" v-model="signupForm.firstName" required placeholder="Votre prénom" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Nom *</label>
+                <input type="text" v-model="signupForm.lastName" required placeholder="Votre nom" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Date Naissance</label>
+                <input type="date" v-model="signupForm.birthDate" class="w-full px-2 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Sexe</label>
+                <select v-model="signupForm.gender" class="w-full px-2 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option value="M">Homme</option>
+                  <option value="F">Femme</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Groupe Sang</label>
+                <select v-model="signupForm.bloodGroup" class="w-full px-2 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-rose-600">
+                  <option v-for="bg in bloodGroups" :key="bg" :value="bg">{{ bg }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Wilaya *</label>
+                <select v-model="signupForm.wilaya" required class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option v-for="w in algerianWilayas" :key="w.code" :value="w.name">{{ w.code }} · {{ w.name }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">N° Carte d'Identité (NIN/CNI)</label>
+                <input type="text" v-model="signupForm.identityCardNumber" placeholder="N° Carte Identité Nationale" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Adresse Email *</label>
+              <input type="email" v-model="signupForm.email" required placeholder="votre.email@exemple.dz" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Mot de passe *</label>
+                <input type="password" v-model="signupForm.password" required minlength="6" placeholder="••••••" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Confirmation *</label>
+                <input type="password" v-model="signupForm.confirmPassword" required minlength="6" placeholder="••••••" class="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              :disabled="authLoading || !signupForm.firstName || !signupForm.lastName || !signupForm.email || !signupForm.password"
+              class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 mt-1">
+              <i class="fa-solid fa-check"></i>
+              <span>Créer mon compte patient & Continuer</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- ==================== OPTION 4: OTP VALIDATION ==================== -->
+        <div v-if="authMode === 'otp'" class="space-y-4 text-center">
+          <div class="w-14 h-14 mx-auto rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-600 flex items-center justify-center text-2xl">
+            <i class="fa-solid fa-comment-sms"></i>
+          </div>
+          <h2 class="text-base font-bold">Code SMS de vérification</h2>
+          <p class="text-xs text-slate-500">Saisissez le code à 6 chiffres reçu par SMS</p>
+          <input 
+            type="text" 
+            maxlength="6" 
+            v-model="authOtpCode" 
+            placeholder="123456" 
+            class="otp-input-field w-48 mx-auto px-4 py-2 border-2 border-sky-500 rounded-xl bg-slate-50 dark:bg-slate-800">
+          <button 
+            @click="verifyPatientOtp" 
+            class="w-full py-3 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-sm rounded-xl shadow">
+            Confirmer & Accéder
+          </button>
+        </div>
+
+        <!-- Helper Switch to Doctor -->
+        <div class="pt-4 border-t border-slate-100 dark:border-slate-800 text-center space-y-2 mt-4">
+          <a href="medecin.html" class="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-user-doctor text-sky-600"></i>
+            <span>Vous êtes médecin ? Accéder à l'Espace Praticien</span>
+            <i class="fa-solid fa-arrow-right text-[10px]"></i>
+          </a>
+
+          <!-- Discrete Collapsible Demo Helper (Not Forced) -->
+          <details class="text-[11px] text-slate-400 pt-1 cursor-pointer">
+            <summary class="hover:underline text-slate-500">Besoin d'un compte démo pré-rempli pour tester ?</summary>
+            <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button 
+                @click="loadDemoExample('sophie')" 
+                class="py-1.5 px-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                Démo Sophie (38 ans)
+              </button>
+              <button 
+                @click="loadDemoExample('marc')" 
+                class="py-1.5 px-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                Démo Marc (60 ans)
+              </button>
+            </div>
+          </details>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== MAIN DASHBOARD (WHEN AUTHENTICATED) ==================== -->
+  <div v-else class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
+
+    <!-- ==================== SIDEBAR TABS NAVIGATION ==================== -->
+    <aside class="w-full md:w-64 flex-shrink-0 flex md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
+      
+      <!-- Tab 1: Rendez-vous -->
+      <button 
+        @click="activeTab = 'appointments'"
+        :class="activeTab === 'appointments' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
+        class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm transition-all text-left whitespace-nowrap min-w-[170px] md:min-w-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-calendar-check text-base"></i>
+          <span>Mes Rendez-vous</span>
+        </div>
+        <span 
+          :class="activeTab === 'appointments' ? 'bg-white/20 text-white' : 'bg-sky-100 dark:bg-sky-900 text-sky-700 dark:text-sky-300'"
+          class="px-2 py-0.5 text-xs rounded-full font-bold">
+          {{ appointments.length }}
+        </span>
+      </button>
+
+      <!-- Tab 2: RECHERCHER UN MÉDECIN (FEATURE DEMANDÉE) -->
+      <button 
+        @click="activeTab = 'doctors'"
+        :class="activeTab === 'doctors' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
+        class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm transition-all text-left whitespace-nowrap min-w-[170px] md:min-w-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-user-doctor text-base"></i>
+          <span>Trouver un Médecin</span>
+        </div>
+        <span 
+          :class="activeTab === 'doctors' ? 'bg-white/20 text-white' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'"
+          class="px-2 py-0.5 text-xs rounded-full font-bold">
+          {{ doctorsCatalog.length }}
+        </span>
+      </button>
+
+      <!-- Tab 3: Discussion avec Docteur -->
+      <button 
+        @click="activeTab = 'chat'"
+        :class="activeTab === 'chat' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
+        class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm transition-all text-left whitespace-nowrap min-w-[170px] md:min-w-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-comments text-base"></i>
+          <span>Parler au Médecin</span>
+        </div>
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Médecin disponible"></span>
+      </button>
+
+      <!-- Tab 4: Mes Documents & Analyses -->
+      <button 
+        @click="activeTab = 'documents'"
+        :class="activeTab === 'documents' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
+        class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm transition-all text-left whitespace-nowrap min-w-[170px] md:min-w-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-folder-open text-base"></i>
+          <span>Mes Documents</span>
+        </div>
+        <span 
+          :class="activeTab === 'documents' ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
+          class="px-2 py-0.5 text-xs rounded-full font-bold">
+          {{ documents.length }}
+        </span>
+      </button>
+
+      <!-- Tab 5: Fiche Santé & Constantes -->
+      <button 
+        @click="activeTab = 'health-card'"
+        :class="activeTab === 'health-card' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
+        class="flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-sm transition-all text-left whitespace-nowrap min-w-[170px] md:min-w-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-heart-pulse text-base text-rose-500"></i>
+          <span>Fiche Santé & Sang</span>
+        </div>
+        <span class="px-2 py-0.5 text-[10px] font-black rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+          {{ patient.bloodGroup }}
+        </span>
+      </button>
+
+      <!-- Bouton d'Édition du Profil dans la sidebar -->
+      <div class="pt-2 border-t border-slate-200 dark:border-slate-800">
+        <button 
+          @click="openEditProfile"
+          class="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 border border-emerald-200 dark:border-emerald-800 shadow-sm">
+          <i class="fa-solid fa-user-pen"></i>
+          <span>Modifier mon profil</span>
+        </button>
+      </div>
+
+      <!-- Mini Carte d'Urgence en bas de sidebar -->
+      <div class="hidden md:block mt-auto pt-4">
+        <div class="p-4 bg-gradient-to-br from-rose-50 to-amber-50 dark:from-slate-800/80 dark:to-slate-800/40 rounded-2xl border border-rose-200 dark:border-slate-700 text-xs space-y-2">
+          <div class="flex items-center justify-between text-rose-700 dark:text-rose-400 font-bold">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-truck-medical"></i>
+              <span>Urgences Algérie</span>
+            </span>
+            <span class="px-1.5 py-0.5 bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200 rounded text-[10px] font-black">14 / 15</span>
+          </div>
+          <p class="text-slate-600 dark:text-slate-300 text-[11px] leading-snug">
+            Protection Civile : <strong>14</strong><br>
+            SAMU : <strong>15</strong> • Police : <strong>17</strong><br>
+            <span v-if="patient.emergencyContact.name">
+              Contact : <strong>{{ patient.emergencyContact.name }}</strong> ({{ patient.emergencyContact.phone }})
+            </span>
+          </p>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ==================== MAIN CONTENT AREA ==================== -->
+    <main class="flex-1 min-w-0">
+
+      <!-- ========================================================================= -->
+      <!-- VIEW 1: MES RENDEZ-VOUS                                                   -->
+      <!-- ========================================================================= -->
+      <div v-if="activeTab === 'appointments'" class="space-y-6">
+        
+        <!-- Header Banner & Stats -->
+        <div class="bg-gradient-to-r from-blue-700 via-sky-600 to-teal-600 rounded-3xl p-6 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <span class="px-2.5 py-1 text-[11px] font-bold bg-white/20 rounded-full inline-block mb-2">
+              📅 Agenda & Consultations
+            </span>
+            <h2 class="text-xl font-black">Vos Rendez-vous Médicaux</h2>
+            <p class="text-xs text-sky-100 mt-1">Prenez rendez-vous en présentiel ou en téléconsultation avec votre praticien.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="activeTab = 'doctors'"
+              class="px-4 py-3 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-2xl transition flex items-center gap-2">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <span>Trouver un Médecin</span>
+            </button>
+            <button 
+              @click="showBookingModal = true"
+              class="px-5 py-3 bg-white text-sky-700 font-black text-xs rounded-2xl shadow-lg hover:bg-sky-50 transition-all flex items-center gap-2 flex-shrink-0">
+              <i class="fa-solid fa-plus text-sky-600"></i>
+              <span>Prendre un RDV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Appointments List -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-sky-500"></i>
+              <span>Consultations Programmées ({{ appointments.length }})</span>
+            </h3>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="appointments.length === 0" class="bg-white dark:bg-slate-900 p-12 text-center rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-sky-50 dark:bg-sky-950 text-sky-600 flex items-center justify-center text-2xl">
+              <i class="fa-regular fa-calendar-check"></i>
+            </div>
+            <h4 class="text-base font-bold text-slate-800 dark:text-slate-200">Aucun rendez-vous pour le moment</h4>
+            <p class="text-xs text-slate-500 mt-1">Recherchez un praticien par spécialité ou wilaya pour réserver votre consultation.</p>
+            <div class="flex items-center justify-center gap-3 mt-4">
+              <button @click="activeTab = 'doctors'" class="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 text-white text-xs font-bold rounded-xl shadow">
+                <i class="fa-solid fa-user-doctor mr-1.5"></i> Trouver un médecin
+              </button>
+              <button @click="showBookingModal = true" class="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl hover:bg-slate-50">
+                + Réserver directement
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards list -->
+          <div 
+            v-for="appt in appointments" 
+            :key="appt.id"
+            class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition space-y-3">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-start sm:items-center gap-3">
+                <div class="px-3.5 py-2.5 bg-sky-50 dark:bg-sky-950/60 rounded-2xl text-center min-w-[75px] border border-sky-100 dark:border-sky-900">
+                  <span class="text-[10px] font-bold text-sky-600 dark:text-sky-400 block uppercase">{{ appt.date }}</span>
+                  <span class="text-lg font-black text-slate-900 dark:text-slate-100">{{ appt.time }}</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ appt.doctorName || 'Dr. Alexandre Moreau' }}</h4>
+                    <span 
+                      :class="appt.type === 'teleconsultation' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border-indigo-200' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200'"
+                      class="px-2 py-0.5 rounded-full text-[10px] font-bold border">
+                      {{ appt.type === 'teleconsultation' ? '📹 Téléconsultation' : '🏥 En Cabinet' }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-0.5">{{ appt.reason }}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 self-end sm:self-center">
+                <span 
+                  :class="appt.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-rose-100 text-rose-800'"
+                  class="px-2.5 py-1 text-xs font-bold rounded-xl">
+                  {{ appt.status === 'confirmed' ? 'Confirmé' : 'Annulé' }}
+                </span>
+                <button 
+                  v-if="appt.status === 'confirmed'"
+                  @click="cancelAppointment(appt.id)"
+                  class="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50 rounded-xl text-xs font-semibold transition">
+                  Annuler
+                </button>
+              </div>
+            </div>
+
+            <div v-if="appt.notes" class="text-xs bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl text-slate-600 dark:text-slate-300 italic">
+              "{{ appt.notes }}"
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- VIEW 2: RECHERCHER UN MÉDECIN (SEARCH & FILTER DOCTORS CATALOG)           -->
+      <!-- ========================================================================= -->
+      <div v-if="activeTab === 'doctors'" class="space-y-6">
+        
+        <!-- Header & Search Banner -->
+        <div class="bg-gradient-to-r from-teal-700 via-emerald-600 to-sky-700 rounded-3xl p-6 text-white shadow-xl space-y-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <span class="px-2.5 py-1 text-[11px] font-bold bg-white/20 rounded-full inline-block mb-1">
+                🇩🇿 Annuaire National des Praticiens • 58 Wilayas
+              </span>
+              <h2 class="text-xl sm:text-2xl font-black">Trouver un Médecin</h2>
+              <p class="text-xs text-teal-100 mt-0.5">Recherchez par nom, spécialité médicale ou wilaya et prenez rendez-vous en ligne.</p>
+            </div>
+            <div class="text-right">
+              <span class="text-2xl font-black">{{ filteredDoctors.length }}</span>
+              <span class="text-xs text-teal-100 block">praticiens disponibles</span>
+            </div>
+          </div>
+
+          <!-- Filters Row -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            
+            <!-- Search Text -->
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input 
+                type="text" 
+                v-model="doctorSearchQuery" 
+                placeholder="Nom du médecin, commune..." 
+                class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border-0 bg-white text-slate-800 placeholder-slate-400 font-semibold focus:ring-2 focus:ring-emerald-400 shadow">
+            </div>
+
+            <!-- Specialty Filter -->
+            <div>
+              <select v-model="doctorSpecialtyFilter" class="w-full px-3 py-2 text-xs rounded-xl border-0 bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-emerald-400 shadow">
+                <option value="">Toutes les spécialités ({{ medicalSpecialtiesList.length }})</option>
+                <option v-for="spec in medicalSpecialtiesList" :key="spec" :value="spec">{{ spec }}</option>
+              </select>
+            </div>
+
+            <!-- Wilaya Filter (58 Wilayas) -->
+            <div>
+              <select v-model="doctorWilayaFilter" class="w-full px-3 py-2 text-xs rounded-xl border-0 bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-emerald-400 shadow">
+                <option value="">Toutes les Wilayas (58)</option>
+                <option v-for="w in algerianWilayas" :key="w.code" :value="w.name">
+                  {{ w.code }} · {{ w.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Quick Checkboxes Pills -->
+          <div class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+            <button 
+              type="button" 
+              @click="doctorTeleconsultFilter = !doctorTeleconsultFilter"
+              :class="doctorTeleconsultFilter ? 'bg-white text-teal-800 font-bold shadow' : 'bg-white/10 hover:bg-white/20 text-white'"
+              class="px-3 py-1 rounded-xl transition flex items-center gap-1.5">
+              <i class="fa-solid fa-video"></i>
+              <span>Téléconsultation HD</span>
+            </button>
+            <button 
+              v-if="doctorSearchQuery || doctorSpecialtyFilter || doctorWilayaFilter || doctorTeleconsultFilter"
+              @click="doctorSearchQuery = ''; doctorSpecialtyFilter = ''; doctorWilayaFilter = ''; doctorTeleconsultFilter = false;"
+              class="px-3 py-1 bg-rose-500/80 hover:bg-rose-500 text-white rounded-xl transition flex items-center gap-1">
+              <i class="fa-solid fa-xmark"></i>
+              <span>Réinitialiser</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Doctors Cards Grid -->
+        <div v-if="filteredDoctors.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div 
+            v-for="doc in filteredDoctors" 
+            :key="doc.id"
+            class="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+            
+            <div>
+              <!-- Top Row: Doctor Header -->
+              <div class="flex items-start gap-3.5">
+                <img :src="doc.avatar" class="w-16 h-16 rounded-2xl object-cover ring-2 ring-emerald-500/20 shadow-sm flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 truncate">
+                      <span>{{ doc.civility }} {{ doc.name }}</span>
+                      <i class="fa-solid fa-certificate text-sky-500 text-xs" title="Praticien Vérifié"></i>
+                    </h3>
+                    <div class="flex items-center gap-1 text-amber-500 text-xs font-bold">
+                      <i class="fa-solid fa-star"></i>
+                      <span>{{ doc.rating || '5.0' }}</span>
+                      <span class="text-slate-400 font-normal">({{ doc.reviewCount || 12 }})</span>
+                    </div>
+                  </div>
+                  
+                  <p class="text-xs font-bold text-sky-600 dark:text-sky-400 mt-0.5">{{ doc.specialty }}</p>
+                  <p class="text-xs text-slate-500 truncate mt-0.5">
+                    <i class="fa-solid fa-location-dot text-rose-500 mr-1 text-[10px]"></i>
+                    {{ doc.cabinetName || 'Cabinet Médical' }} • {{ doc.city || 'Centre' }} (Wilaya de {{ doc.wilaya }})
+                  </p>
+                </div>
+              </div>
+
+              <!-- Consultation Modes & Availability Tags (No Money / Payment) -->
+              <div class="flex flex-wrap items-center gap-2 mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                <span class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-1">
+                  <i class="fa-solid fa-house-medical text-sky-500"></i> Au Cabinet
+                </span>
+                <span v-if="doc.teleconsultation" class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-lg font-semibold border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                  <i class="fa-solid fa-video text-indigo-500"></i> Téléconsultation
+                </span>
+                <span class="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-lg font-semibold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                  <i class="fa-solid fa-id-card text-emerald-600"></i> CNI / NIN
+                </span>
+                <span class="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg font-semibold ml-auto">
+                  ⚡ {{ doc.nextSlot || 'Sur RDV' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2 pt-2">
+              <button 
+                @click="openBookingForDoctor(doc)"
+                class="flex-1 py-2 px-3 bg-gradient-to-r from-sky-600 to-teal-600 hover:from-sky-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-calendar-plus"></i>
+                <span>Prendre RDV</span>
+              </button>
+              <button 
+                @click="startChatWithDoctor(doc)"
+                class="py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                title="Poser une question">
+                <i class="fa-solid fa-comments"></i>
+                <span>Discuter</span>
+              </button>
+              <button 
+                @click="viewDoctorDetails(doc)"
+                class="p-2 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 rounded-xl text-xs transition"
+                title="Voir la fiche détaillée">
+                <i class="fa-solid fa-circle-info"></i>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Empty search results -->
+        <div v-else class="bg-white dark:bg-slate-900 p-12 text-center rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-user-slash"></i>
+          </div>
+          <h4 class="text-base font-bold text-slate-800 dark:text-slate-200">Aucun praticien ne correspond à vos filtres</h4>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">Essayez de sélectionner "Toutes les spécialités" ou d'élargir la recherche géographique.</p>
+          <button 
+            @click="doctorSearchQuery = ''; doctorSpecialtyFilter = ''; doctorWilayaFilter = ''; doctorTeleconsultFilter = false;" 
+            class="px-4 py-2 bg-sky-600 text-white text-xs font-bold rounded-xl shadow">
+            Réinitialiser les filtres de recherche
+          </button>
+        </div>
+
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- VIEW 3: DISCUSSION MÉDICALE EN LIGNE (CHAT AVEC DOCTEUR)                 -->
+      <!-- ========================================================================= -->
+      <div v-if="activeTab === 'chat'" class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[750px]">
+        
+        <!-- Chat Header -->
+        <div class="p-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="relative">
+              <img :src="doctorReferent.avatar" class="w-10 h-10 rounded-2xl object-cover ring-2 ring-emerald-500/40">
+              <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"></span>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>{{ doctorReferent.civility }} {{ doctorReferent.name }}</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700">Médecin Référent</span>
+              </h3>
+              <p class="text-[11px] text-slate-500">{{ doctorReferent.specialty }} • {{ doctorReferent.cabinetName }} ({{ doctorReferent.wilaya }})</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="activeTab = 'doctors'"
+              class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate text-xs text-sky-600"></i>
+              <span class="hidden sm:inline">Changer de médecin</span>
+            </button>
+            <button 
+              @click="openBookingForDoctor(doctorReferent)"
+              class="px-3 py-1.5 bg-gradient-to-r from-sky-600 to-teal-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5">
+              <i class="fa-solid fa-calendar-plus text-xs"></i>
+              <span class="hidden sm:inline">Prendre RDV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-slate-50/50 dark:bg-slate-950/20">
+          
+          <!-- Empty Chat Welcome -->
+          <div v-if="messages.length === 0" class="p-8 text-center max-w-md mx-auto space-y-2">
+            <div class="w-12 h-12 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">
+              <i class="fa-regular fa-comments"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">Discussion Médicale Sécurisée</h4>
+            <p class="text-xs text-slate-500">Posez vos questions ou transmettez vos bilans au {{ doctorReferent.name }}. Vos échanges sont protégés par le secret médical.</p>
+          </div>
+
+          <div 
+            v-for="msg in messages" 
+            :key="msg.id"
+            :class="msg.sender === 'patient' ? 'justify-end' : 'justify-start'"
+            class="flex items-end gap-2.5">
+            
+            <img 
+              v-if="msg.sender === 'doctor'" 
+              :src="doctorReferent.avatar" 
+              class="w-7 h-7 rounded-full object-cover">
+
+            <div 
+              :class="msg.sender === 'patient' ? 'bg-sky-600 text-white chat-bubble-doctor shadow-md shadow-sky-600/20' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 chat-bubble-patient shadow-sm'"
+              class="max-w-md p-3.5 rounded-2xl text-xs space-y-1.5">
+              
+              <div class="font-semibold text-[10px] opacity-75">{{ msg.senderName }}</div>
+              <p class="leading-relaxed">{{ msg.text }}</p>
+
+              <!-- Attached file in message -->
+              <div v-if="msg.attachment" class="p-2.5 rounded-xl bg-black/10 dark:bg-white/10 flex items-center gap-2 mt-1">
+                <i class="fa-solid fa-file-medical text-base"></i>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold truncate text-[11px]">{{ msg.attachment.title }}</div>
+                  <div class="text-[9px] opacity-75">{{ msg.attachment.size }}</div>
+                </div>
+              </div>
+
+              <div class="text-[9px] opacity-60 text-right">{{ msg.time }}</div>
+            </div>
+
+            <img 
+              v-if="msg.sender === 'patient'" 
+              :src="patient.avatar" 
+              class="w-7 h-7 rounded-full object-cover">
+          </div>
+        </div>
+
+        <!-- Quick Reply Chips -->
+        <div class="px-4 py-2 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto text-[11px] scrollbar-none">
+          <span class="text-slate-400 font-bold whitespace-nowrap">Raccourcis :</span>
+          <button @click="sendQuickPatientMessage('Bonjour Docteur, confirmez-vous notre consultation ?')" class="px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full hover:bg-slate-100 whitespace-nowrap">
+            📅 Confirmer le RDV
+          </button>
+          <button @click="sendQuickPatientMessage('Bonjour Docteur, j\'ai besoin d\'un renouvellement de mon ordonnance.')" class="px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full hover:bg-slate-100 whitespace-nowrap">
+            💊 Renouvellement ordonnance
+          </button>
+          <button @click="sendQuickPatientMessage('Voici mes derniers résultats d\'analyses sanguines en pièce jointe.')" class="px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full hover:bg-slate-100 whitespace-nowrap">
+            🩸 Envoi de bilan
+          </button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form @submit.prevent="sendMessage" class="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+          
+          <button 
+            type="button" 
+            @click="activeTab = 'documents'" 
+            class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-sky-600 transition"
+            title="Joindre un document de mon dossier">
+            <i class="fa-solid fa-paperclip text-sm"></i>
+          </button>
+
+          <input 
+            type="text" 
+            v-model="newMessageText" 
+            placeholder="Écrivez votre message au médecin..." 
+            class="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 border-0 rounded-2xl text-xs focus:ring-2 focus:ring-sky-500 text-slate-900 dark:text-slate-100">
+
+          <button 
+            type="submit" 
+            :disabled="!newMessageText.trim() && !selectedAttachmentForChat"
+            class="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-2xl text-xs font-bold transition shadow disabled:opacity-40 flex items-center gap-1.5">
+            <span>Envoyer</span>
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        </form>
+
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- VIEW 4: MES DOCUMENTS MÉDICAUX (UPLOAD & CONSULTATION)                    -->
+      <!-- ========================================================================= -->
+      <div v-if="activeTab === 'documents'" class="space-y-6">
+        
+        <!-- Header & Upload CTA -->
+        <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-700 rounded-3xl p-6 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <span class="px-2.5 py-1 text-[11px] font-bold bg-white/20 rounded-full inline-block mb-2">
+              📂 Coffre-fort Numérique
+            </span>
+            <h2 class="text-xl font-black">Vos Documents Médicaux</h2>
+            <p class="text-xs text-teal-100 mt-1">Déposez vos analyses de laboratoire, ordonnances, radiographies et comptes-rendus.</p>
+          </div>
+          <button 
+            @click="showUploadModal = true"
+            class="px-5 py-3 bg-white text-emerald-800 font-black text-xs rounded-2xl shadow-lg hover:bg-emerald-50 transition-all flex items-center gap-2 flex-shrink-0">
+            <i class="fa-solid fa-cloud-arrow-up text-emerald-600"></i>
+            <span>Déposer un document</span>
+          </button>
+        </div>
+
+        <!-- Filter Tags -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs font-semibold scrollbar-none">
+          <button 
+            @click="documentCategoryFilter = 'all'"
+            :class="documentCategoryFilter === 'all' ? 'bg-sky-600 text-white font-bold' : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-800'"
+            class="px-3.5 py-1.5 rounded-xl transition whitespace-nowrap">
+            Tous les documents ({{ documents.length }})
+          </button>
+          <button 
+            @click="documentCategoryFilter = 'Analyse Biologique'"
+            :class="documentCategoryFilter === 'Analyse Biologique' ? 'bg-sky-600 text-white font-bold' : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-800'"
+            class="px-3.5 py-1.5 rounded-xl transition whitespace-nowrap">
+            🧪 Analyses de sang
+          </button>
+          <button 
+            @click="documentCategoryFilter = 'Ordonnance'"
+            :class="documentCategoryFilter === 'Ordonnance' ? 'bg-sky-600 text-white font-bold' : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-800'"
+            class="px-3.5 py-1.5 rounded-xl transition whitespace-nowrap">
+            💊 Ordonnances
+          </button>
+          <button 
+            @click="documentCategoryFilter = 'Imagerie Médicale'"
+            :class="documentCategoryFilter === 'Imagerie Médicale' ? 'bg-sky-600 text-white font-bold' : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-800'"
+            class="px-3.5 py-1.5 rounded-xl transition whitespace-nowrap">
+            🩻 Radios & Échographies
+          </button>
+          <button 
+            @click="documentCategoryFilter = 'Certificat'"
+            :class="documentCategoryFilter === 'Certificat' ? 'bg-sky-600 text-white font-bold' : 'bg-white dark:bg-slate-900 text-slate-600 border border-slate-200 dark:border-slate-800'"
+            class="px-3.5 py-1.5 rounded-xl transition whitespace-nowrap">
+            📋 Certificats
+          </button>
+        </div>
+
+        <!-- Empty state -->
+        <div v-if="filteredDocuments.length === 0" class="bg-white dark:bg-slate-900 p-12 text-center rounded-3xl border border-slate-200 dark:border-slate-800">
+          <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center text-2xl">
+            <i class="fa-solid fa-folder-plus"></i>
+          </div>
+          <h4 class="text-base font-bold text-slate-800 dark:text-slate-200">Aucun document classé dans cette catégorie</h4>
+          <p class="text-xs text-slate-500 mt-1">Téléversez un fichier PDF ou photo pour le sauvegarder dans votre espace personnel.</p>
+          <button @click="showUploadModal = true" class="mt-4 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow">
+            + Ajouter mon premier document
+          </button>
+        </div>
+
+        <!-- Documents Grid -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div 
+            v-for="doc in filteredDocuments" 
+            :key="doc.id"
+            class="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3">
+            
+            <div class="flex items-start gap-3">
+              <div 
+                :class="doc.color === 'emerald' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950' : (doc.color === 'indigo' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950' : (doc.color === 'amber' ? 'bg-amber-100 text-amber-600 dark:bg-amber-950' : 'bg-sky-100 text-sky-600 dark:bg-sky-950'))"
+                class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0">
+                <i :class="'fa-solid ' + doc.icon"></i>
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{{ doc.category }}</span>
+                <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">{{ doc.title }}</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">{{ doc.doctor }} • {{ doc.date }} • {{ doc.size }}</p>
+              </div>
+            </div>
+
+            <p v-if="doc.notes" class="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl italic">
+              "{{ doc.notes }}"
+            </p>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button 
+                @click="openDocumentPreview(doc)" 
+                class="text-xs font-bold text-sky-600 hover:underline flex items-center gap-1">
+                <i class="fa-solid fa-eye text-xs"></i>
+                <span>Aperçu</span>
+              </button>
+              <div class="flex items-center gap-2">
+                <button 
+                  @click="shareDocumentToChat(doc)" 
+                  class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg transition"
+                  title="Partager directement au chat du médecin">
+                  <i class="fa-solid fa-paper-plane mr-1 text-sky-600"></i>
+                  <span>Transmettre</span>
+                </button>
+                <button 
+                  @click="deleteDocument(doc.id)" 
+                  class="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                  title="Supprimer">
+                  <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- VIEW 5: FICHE SANTÉ DU PATIENT (GROUPE SANGUIN, ALLERGIES, CONSTANTES)    -->
+      <!-- ========================================================================= -->
+      <div v-if="activeTab === 'health-card'" class="space-y-6">
+        
+        <!-- Header -->
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-heart-pulse text-rose-500"></i>
+              <span>Fiche Médicale & Constantes Vitales</span>
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Vos données de santé confidentielles partagées avec votre médecin référent.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="openEditProfile"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-2xl transition flex items-center gap-1.5">
+              <i class="fa-solid fa-user-pen text-sky-600"></i>
+              <span>Modifier Profil</span>
+            </button>
+            <button 
+              @click="saveHealthCard"
+              class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-2xl shadow hover:opacity-95 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Enregistrer</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Informations Personnelles État Civil Card -->
+        <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <i class="fa-solid fa-id-card text-sky-500"></i>
+              <span>Informations Personnelles du Patient</span>
+            </h3>
+            <button @click="openEditProfile" class="text-xs font-bold text-sky-600 hover:underline flex items-center gap-1">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>Éditer toutes mes informations</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Nom Complet</span>
+              <span class="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                {{ patient.civility }} {{ patient.firstName || 'Non renseigné' }} {{ patient.lastName }}
+              </span>
+            </div>
+
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Wilaya de résidence</span>
+              <span class="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                {{ patient.wilaya }} ({{ patient.city || 'Algérie' }})
+              </span>
+            </div>
+
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">Téléphone portable</span>
+              <span class="font-bold text-slate-800 dark:text-slate-100 font-mono text-sm">
+                {{ patient.phone || 'Non renseigné' }}
+              </span>
+            </div>
+
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+              <span class="text-[10px] text-slate-400 font-bold uppercase block">N° Carte d'Identité (NIN / CNI)</span>
+              <span class="font-bold text-emerald-600 font-mono text-sm">
+                {{ patient.identityCardNumber || 'Non renseigné' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- COLONNE 1: CARTE SANGUINE, PFP & IDENTITÉ -->
+          <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 text-center">
+            
+            <!-- Photo de Profil PFP avec Upload depuis appareil -->
+            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 flex items-center gap-3 text-left">
+              <div class="relative group">
+                <img :src="patient.avatar" class="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30 shadow-sm">
+                <label class="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition text-white text-xs" title="Changer la photo">
+                  <i class="fa-solid fa-camera"></i>
+                  <input type="file" @change="handlePfpUpload" accept="image/*" class="hidden">
+                </label>
+              </div>
+              <div class="flex-1 min-w-0">
+                <span class="text-[10px] text-slate-400 font-bold uppercase block">Photo de profil</span>
+                <label class="inline-flex items-center gap-1.5 px-2.5 py-1 mt-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition shadow-sm">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  <span>Depuis l'appareil</span>
+                  <input type="file" @change="handlePfpUpload" accept="image/*" class="hidden">
+                </label>
+              </div>
+            </div>
+
+            <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex flex-col items-center justify-center shadow-xl shadow-rose-500/25 relative overflow-hidden">
+              <i class="fa-solid fa-droplet text-xs opacity-50 absolute top-2 right-2"></i>
+              <span class="text-3xl font-black tracking-tight leading-none">{{ patient.bloodGroup }}</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-90">Groupe Sanguin</span>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Modifier le Groupe Sanguin :</label>
+              <div class="grid grid-cols-4 gap-1.5 max-w-xs mx-auto">
+                <button 
+                  v-for="bg in bloodGroups" 
+                  :key="bg"
+                  type="button"
+                  @click="patient.bloodGroup = bg; savePatientProfileLocally()"
+                  :class="patient.bloodGroup === bg ? 'bg-rose-600 text-white font-black shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'"
+                  class="py-1 text-xs font-bold rounded-xl transition">
+                  {{ bg }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Carte d'Identité (NIN / CNI) -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 text-left space-y-1">
+              <span class="text-[11px] font-bold text-slate-500 uppercase">N° Carte d'Identité (NIN / CNI)</span>
+              <input 
+                type="text" 
+                v-model="patient.identityCardNumber" 
+                @change="savePatientProfileLocally"
+                placeholder="N° Carte Identité Nationale"
+                class="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+            </div>
+
+            <!-- Wilaya de résidence -->
+            <div class="text-left space-y-1">
+              <span class="text-[11px] font-bold text-slate-500 uppercase">Wilaya & Commune</span>
+              <div class="grid grid-cols-2 gap-2">
+                <select v-model="patient.wilaya" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                  <option v-for="w in algerianWilayas" :key="w.code" :value="w.name">
+                    {{ w.code }} · {{ w.name }}
+                  </option>
+                </select>
+                <input type="text" v-model="patient.city" placeholder="Commune" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              </div>
+            </div>
+
+          </div>
+
+          <!-- COLONNE 2: BIOMÉTRIE & CONSTANTES DE SANTÉ -->
+          <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-weight-scale text-sky-500"></i>
+              <span>Biométrie & Signes Vitaux</span>
+            </h3>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Poids (kg)</label>
+                <input 
+                  type="number" 
+                  v-model.number="patient.weight" 
+                  @input="calculateBmi"
+                  placeholder="ex: 70"
+                  class="w-full px-3 py-2 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Taille (cm)</label>
+                <input 
+                  type="number" 
+                  v-model.number="patient.height" 
+                  @input="calculateBmi"
+                  placeholder="ex: 175"
+                  class="w-full px-3 py-2 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+              </div>
+            </div>
+
+            <!-- Calcul automatique IMC -->
+            <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-2xl border border-sky-100 dark:border-sky-900 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-sky-700 dark:text-sky-300 block">Indice de Masse Corporelle (IMC)</span>
+                <span class="text-xl font-black text-slate-900 dark:text-slate-100">{{ patient.bmi || '--' }}</span>
+              </div>
+              <span 
+                :class="bmiStatus.color === 'emerald' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'"
+                class="px-2.5 py-1 rounded-xl text-xs font-bold">
+                {{ bmiStatus.label }}
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Tension Artérielle</label>
+                <input 
+                  type="text" 
+                  v-model="patient.bloodPressure" 
+                  placeholder="12/8" 
+                  class="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Glycémie à jeun (g/L)</label>
+                <input 
+                  type="text" 
+                  v-model="patient.bloodSugar" 
+                  placeholder="0.95" 
+                  class="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              </div>
+            </div>
+
+          </div>
+
+          <!-- COLONNE 3: ALLERGIES, TRAITEMENTS & CONTACT URGENCE -->
+          <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            
+            <!-- Allergies -->
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-rose-500 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Allergies Connues</span>
+              </h3>
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                <span 
+                  v-for="(all, idx) in patient.allergies" 
+                  :key="idx" 
+                  class="px-2 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-[11px] font-bold rounded-lg flex items-center gap-1.5">
+                  {{ all }}
+                  <button @click="removeAllergy(idx)" class="hover:text-rose-900">&times;</button>
+                </span>
+                <span v-if="patient.allergies.length === 0" class="text-xs text-slate-400 italic">Aucune allergie renseignée</span>
+              </div>
+              <div class="flex gap-2">
+                <input 
+                  type="text" 
+                  v-model="newAllergyInput" 
+                  @keyup.enter="addAllergy" 
+                  placeholder="Ex: Pénicilline, Pollen..." 
+                  class="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <button @click="addAllergy" class="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold">+</button>
+              </div>
+            </div>
+
+            <!-- Traitements en cours -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-sky-600 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-pills"></i>
+                <span>Traitements Quotidiens</span>
+              </h3>
+              <div class="space-y-1 mb-2">
+                <div 
+                  v-for="(trt, idx) in patient.currentTreatments" 
+                  :key="idx" 
+                  class="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl text-slate-700 dark:text-slate-300">
+                  <span>{{ trt }}</span>
+                  <button @click="removeTreatment(idx)" class="text-slate-400 hover:text-rose-600">&times;</button>
+                </div>
+                <span v-if="patient.currentTreatments.length === 0" class="text-xs text-slate-400 italic block">Aucun traitement régulier</span>
+              </div>
+              <div class="flex gap-2">
+                <input 
+                  type="text" 
+                  v-model="newTreatmentInput" 
+                  @keyup.enter="addTreatment" 
+                  placeholder="Médicament et posologie..." 
+                  class="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <button @click="addTreatment" class="px-3 py-1.5 bg-sky-600 text-white rounded-xl text-xs font-bold">+</button>
+              </div>
+            </div>
+
+            <!-- Contact d'urgence -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Personne à prévenir en cas d'urgence</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <input type="text" v-model="patient.emergencyContact.name" placeholder="Nom contact" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <input type="text" v-model="patient.emergencyContact.relation" placeholder="Lien (ex: Conjoint)" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              </div>
+              <input type="tel" v-model="patient.emergencyContact.phone" placeholder="Numéro d'urgence" class="w-full px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Bouton Reset Data / Dossier Vierge -->
+        <div class="p-4 bg-slate-100 dark:bg-slate-800/40 rounded-2xl flex items-center justify-between text-xs">
+          <div class="text-slate-500">
+            Besoin d'effacer les données enregistrées dans votre navigateur pour repartir de zéro ?
+          </div>
+          <button 
+            @click="resetPatientData" 
+            class="px-3 py-1.5 border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-800 rounded-xl font-bold transition">
+            Réinitialiser mon dossier vierge
+          </button>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ==================== MODAL: ÉDITION COMPLÈTE DU PROFIL PATIENT (FEATURE DEMANDÉE) ==================== -->
+  <div v-if="showEditProfileModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full p-6 sm:p-8 space-y-5 my-8">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <h3 class="text-lg font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-user-pen text-emerald-600"></i>
+            <span>Modifier mes Informations Personnelles</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">Mettez à jour votre état civil, coordonnées et profil médical</p>
+        </div>
+        <button @click="showEditProfileModal = false" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="saveProfileChanges" class="space-y-4">
+        
+        <!-- SECTION 1: ÉTAT CIVIL -->
+        <div class="space-y-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-600">1. Identité & Contact</span>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Civilité</label>
+              <select v-model="profileEditForm.civility" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                <option value="M.">M.</option>
+                <option value="Mme">Mme</option>
+                <option value="Mlle">Mlle</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Prénom *</label>
+              <input type="text" v-model="profileEditForm.firstName" required class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold">
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Nom *</label>
+              <input type="text" v-model="profileEditForm.lastName" required class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Date de naissance</label>
+              <input type="date" v-model="profileEditForm.birthDate" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Sexe</label>
+              <select v-model="profileEditForm.gender" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                <option value="M">Homme</option>
+                <option value="F">Femme</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Groupe Sanguin</label>
+              <select v-model="profileEditForm.bloodGroup" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-black text-rose-600">
+                <option v-for="bg in bloodGroups" :key="bg" :value="bg">{{ bg }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Numéro de téléphone</label>
+              <input type="text" v-model="profileEditForm.phone" placeholder="+213 5XX..." class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Adresse Email</label>
+              <input type="email" v-model="profileEditForm.email" placeholder="patient@exemple.dz" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Wilaya de résidence</label>
+              <select v-model="profileEditForm.wilaya" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+                <option v-for="w in algerianWilayas" :key="w.code" :value="w.name">{{ w.code }} · {{ w.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">Commune / Ville</label>
+              <input type="text" v-model="profileEditForm.city" placeholder="Ex: El Biar, Oran Centre..." class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">N° Carte d'Identité (NIN / CNI)</label>
+            <input type="text" v-model="profileEditForm.identityCardNumber" placeholder="Ex: 18805160123456" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+          </div>
+        </div>
+
+        <!-- SECTION 2: AVATAR / PHOTO DE PROFIL DEPUIS L'APPAREIL -->
+        <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-600">2. Photo de profil (PFP)</span>
+            <label class="cursor-pointer px-3 py-1 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-800 shadow-sm">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Choisir depuis l'appareil</span>
+              <input type="file" @change="handlePfpUpload" accept="image/*" class="hidden">
+            </label>
+          </div>
+          
+          <div class="flex items-center gap-3">
+            <img :src="profileEditForm.avatar" class="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/40 shadow-sm flex-shrink-0">
+            <div class="flex-1 min-w-0">
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">Importez une photo depuis votre galerie / ordinateur ou sélectionnez un avatar :</p>
+              <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                <button 
+                  type="button" 
+                  v-for="(av, i) in avatarPresets" 
+                  :key="i"
+                  @click="profileEditForm.avatar = av"
+                  :class="profileEditForm.avatar === av ? 'ring-2 ring-emerald-500 scale-105' : 'opacity-70 hover:opacity-100'"
+                  class="w-8 h-8 rounded-full overflow-hidden transition flex-shrink-0">
+                  <img :src="av" class="w-full h-full object-cover">
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-4 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+          <button 
+            type="button" 
+            @click="showEditProfileModal = false" 
+            class="px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50">
+            Annuler
+          </button>
+          <button 
+            type="submit" 
+            class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Enregistrer les modifications</span>
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: DÉTAILS D'UN MÉDECIN ==================== -->
+  <div v-if="selectedDoctorForDetails" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 my-8">
+      
+      <div class="flex items-start justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div class="flex items-center gap-3">
+          <img :src="selectedDoctorForDetails.avatar" class="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500/30">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <span>{{ selectedDoctorForDetails.civility }} {{ selectedDoctorForDetails.name }}</span>
+              <i class="fa-solid fa-certificate text-sky-500 text-xs"></i>
+            </h3>
+            <p class="text-xs font-bold text-sky-600 dark:text-sky-400">{{ selectedDoctorForDetails.specialty }}</p>
+            <p class="text-[11px] text-slate-500">{{ selectedDoctorForDetails.cabinetName }} • Wilaya de {{ selectedDoctorForDetails.wilaya }}</p>
+          </div>
+        </div>
+        <button @click="selectedDoctorForDetails = null" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl">
+          {{ selectedDoctorForDetails.about }}
+        </p>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Adresse Cabinet</span>
+            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">{{ selectedDoctorForDetails.address }}</span>
+          </div>
+          <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Téléphone direct</span>
+            <span class="font-bold text-emerald-600 font-mono text-xs">{{ selectedDoctorForDetails.phone }}</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-between">
+          <div>
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Modalités de consultation</span>
+            <span class="font-bold text-slate-900 dark:text-slate-100 text-xs">Consultation en Cabinet & Téléconsultation HD</span>
+          </div>
+          <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px] flex items-center gap-1">
+            <i class="fa-solid fa-id-card"></i> NIN / CNI acceptée
+          </span>
+        </div>
+      </div>
+
+      <div class="pt-3 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+        <button 
+          @click="startChatWithDoctor(selectedDoctorForDetails); selectedDoctorForDetails = null;" 
+          class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5">
+          <i class="fa-solid fa-comments"></i>
+          <span>Discuter</span>
+        </button>
+
+        <button 
+          @click="openBookingForDoctor(selectedDoctorForDetails); selectedDoctorForDetails = null;" 
+          class="px-5 py-2.5 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+          <i class="fa-solid fa-calendar-plus"></i>
+          <span>Prendre RDV</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PRISE DE RENDEZ-VOUS ==================== -->
+  <div v-if="showBookingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 my-8">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus text-sky-600"></i>
+          <span>Prendre un Rendez-vous Médical</span>
+        </h3>
+        <button @click="showBookingModal = false" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="bookAppointment" class="space-y-3.5">
+        
+        <!-- Praticien sélectionné -->
+        <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-2xl border border-sky-100 dark:border-sky-900 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-sm">
+              <i class="fa-solid fa-user-doctor"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-900 dark:text-slate-100">{{ bookingForm.doctorName }}</div>
+              <div class="text-[11px] text-sky-600 dark:text-sky-400">{{ bookingForm.doctorSpecialty }} • {{ bookingForm.doctorWilaya || 'Algérie' }}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">{{ bookingForm.type === 'teleconsultation' ? 'Téléconsultation' : 'Présentiel' }}</span>
+          </div>
+        </div>
+
+        <!-- Mode de consultation -->
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Lieu de consultation</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button 
+              type="button" 
+              @click="bookingForm.type = 'presentiel'"
+              :class="bookingForm.type === 'presentiel' ? 'bg-sky-600 text-white font-bold shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+              class="py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-building"></i>
+              <span>Au Cabinet</span>
+            </button>
+            <button 
+              type="button" 
+              @click="bookingForm.type = 'teleconsultation'"
+              :class="bookingForm.type === 'teleconsultation' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+              class="py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-video"></i>
+              <span>Visioconsultation</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Motif -->
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Motif de consultation</label>
+          <select v-model="bookingForm.reason" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+            <option value="Consultation générale de contrôle">Consultation générale de contrôle</option>
+            <option value="Renouvellement traitement médical">Renouvellement ordonnance & traitement</option>
+            <option value="Lecture d'analyses biologiques et sanguines">Lecture d'analyses sanguines</option>
+            <option value="Suivi spécialisé">Avis médical & suivi spécialisé</option>
+            <option value="Certificat médical d'aptitude sportive">Certificat médical d'aptitude</option>
+            <option value="Fièvre, toux ou douleurs récentes">Fièvre / Toux / Douleur</option>
+          </select>
+        </div>
+
+        <!-- Date & Heure -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Date</label>
+            <input type="date" v-model="bookingForm.date" required class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Créneau horaire</label>
+            <select v-model="bookingForm.time" required class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold font-mono">
+              <option v-for="slot in availableTimeSlots" :key="slot" :value="slot">
+                {{ slot }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Remarques ou symptômes pour le médecin (optionnel)</label>
+          <textarea rows="2" v-model="bookingForm.notes" placeholder="Décrivez succinctement la raison de votre venue..." class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+          <button type="button" @click="showBookingModal = false" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50">
+            Annuler
+          </button>
+          <button type="submit" class="px-5 py-2 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow hover:opacity-95 transition">
+            Confirmer la réservation
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: UPLOAD DE DOCUMENT ==================== -->
+  <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full p-6 space-y-4 my-8">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-file-arrow-up text-emerald-600"></i>
+          <span>Déposer un Document Médical</span>
+        </h3>
+        <button @click="showUploadModal = false" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="saveUploadedDocument" class="space-y-3.5">
+        
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Titre du document *</label>
+          <input type="text" v-model="uploadForm.title" required placeholder="Ex: Bilan_Sanguin_Pasteur_Oct2026.pdf" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Catégorie</label>
+            <select v-model="uploadForm.category" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
+              <option value="Analyse Biologique">Analyse Biologique</option>
+              <option value="Ordonnance">Ordonnance</option>
+              <option value="Imagerie Médicale">Radio / Échographie</option>
+              <option value="Certificat">Certificat</option>
+              <option value="Compte-rendu">Compte-rendu</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Émetteur / Labo</label>
+            <input type="text" v-model="uploadForm.doctor" placeholder="Laboratoire ou Dr." class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+          </div>
+        </div>
+
+        <!-- File Input -->
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Sélectionner un fichier (PDF, JPG, PNG)</label>
+          <input 
+            type="file" 
+            @change="handleFileUpload" 
+            accept=".pdf,image/*" 
+            required
+            class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer">
+          <p v-if="uploadForm.fileName" class="text-[11px] text-emerald-600 mt-1 font-semibold">
+            ✓ Fichier chargé : {{ uploadForm.fileName }} ({{ uploadForm.fileSize }})
+          </p>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Remarques ou résultats clés (optionnel)</label>
+          <textarea rows="2" v-model="uploadForm.notes" placeholder="Ex: Bilan rénal et glycémie à jeun..." class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></textarea>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+          <button type="button" @click="showUploadModal = false" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50">
+            Annuler
+          </button>
+          <button type="submit" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow hover:opacity-95 transition">
+            Enregistrer dans mon dossier
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: APERÇU DOCUMENT ==================== -->
+  <div v-if="previewModalDoc" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4 my-8">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate">
+          <i class="fa-solid fa-file-lines text-sky-600"></i>
+          <span>{{ previewModalDoc.title }}</span>
+        </h3>
+        <button @click="previewModalDoc = null" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-center space-y-3">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-600 flex items-center justify-center text-3xl">
+          <i :class="'fa-solid ' + previewModalDoc.icon"></i>
+        </div>
+        <h4 class="font-bold text-sm text-slate-900 dark:text-slate-100">{{ previewModalDoc.title }}</h4>
+        <div class="text-[11px] text-slate-400">{{ previewModalDoc.category }} • {{ previewModalDoc.size }} • {{ previewModalDoc.date }}</div>
+        <p v-if="previewModalDoc.notes" class="text-xs text-slate-600 px-6 italic">{{ previewModalDoc.notes }}</p>
+      </div>
+
+      <div class="flex items-center justify-between pt-2">
+        <button 
+          @click="shareDocumentToChat(previewModalDoc); previewModalDoc = null" 
+          class="px-3.5 py-2 bg-sky-600 text-white text-xs font-bold rounded-xl shadow hover:bg-sky-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+          <span>Transmettre au Médecin</span>
+        </button>
+        <button @click="previewModalDoc = null" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATIONS ==================== -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full pointer-events-none">
+    <div 
+      v-for="toast in toasts" 
+      :key="toast.id"
+      class="p-4 rounded-2xl shadow-xl border pointer-events-auto flex items-start gap-3 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+      <i 
+        :class="toast.type === 'success' ? 'fa-solid fa-circle-check text-emerald-500' : (toast.type === 'error' ? 'fa-solid fa-circle-xmark text-rose-500' : (toast.type === 'warning' ? 'fa-solid fa-triangle-exclamation text-amber-500' : 'fa-solid fa-circle-info text-sky-500'))"
+        class="text-lg mt-0.5"></i>
+      <div class="flex-1 min-w-0">
+        <h5 class="text-xs font-bold text-slate-900 dark:text-slate-100">{{ toast.title }}</h5>
+        <p v-if="toast.message" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{{ toast.message }}</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Data JS & Patient Logic -->
+<script src="data.js"></script>
+<script src="firebase-config.js"></script>
+<script src="patient-app.js"></script>
+
+</body>
+</html>

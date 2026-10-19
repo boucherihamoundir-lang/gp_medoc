@@ -1,0 +1,665 @@
+rules_version = '2';
+
+// ===============================================================
+// MediDoc Pro - Cloud Firestore Security Rules
+// Application: Portail Médical & Espace Praticien (Cabinet Médical)
+// Target Environment: Production
+// ===============================================================
+//
+// Assumed Data Model:
+//
+// 1. Collection: doctors/{doctorId}
+//    Document ID: doctorId (Doctor UID or 'profile')
+//    Fields:
+//      - id: string (optional, 0..100 chars) - Doctor identifier
+//      - name: string (optional, 0..100 chars) - Practitioner full name
+//      - civility: string (optional, 1..20 chars) - e.g. "Dr.", "Pr."
+//      - firstName: string (required, 1..100 chars) - Practitioner first name
+//      - lastName: string (required, 1..100 chars) - Practitioner last name
+//      - title: string (optional, 1..200 chars) - Medical title & specialty description
+//      - specialty: string (required, 1..150 chars) - Primary specialty
+//      - subSpecialties: list (optional, max 30 items) - Sub-specialties list
+//      - rpps: string (optional, 1..30 chars) - Official RPPS registration number
+//      - adeli: string (optional, 1..30 chars) - ADELI practitioner identifier
+//      - bio: string (optional, 0..3000 chars) - Practitioner biography & presentation
+//      - avatar: string (optional, 0..1000000 chars) - Profile picture URL or Base64 data URL
+//      - status: string (optional, in ['available', 'in_consultation', 'away', 'offline'])
+//      - statusMessage: string (optional, 0..200 chars) - Status notice
+//      - cabinetName: string (optional, 1..200 chars) - Clinic or practice name
+//      - address: string (optional, 1..300 chars) - Street address
+//      - postalCode: string (optional, 1..20 chars) - Postal code
+//      - city: string (optional, 1..100 chars) - City name
+//      - wilaya: string (optional, 1..100 chars) - Wilaya / province
+//      - country: string (optional, 1..100 chars) - Country name
+//      - floor: string (optional, 0..100 chars) - Floor / elevator access details
+//      - doorCode: string (optional, 0..50 chars) - Digicode / entry code
+//      - accessPmr: bool (optional) - Disability / PMR accessibility flag
+//      - parking: string (optional, 0..300 chars) - Nearby parking information
+//      - phoneOffice: string (optional, 0..30 chars) - Office / secretariat phone
+//      - phoneEmergency: string (optional, 0..30 chars) - Emergency line phone
+//      - email: string (optional, 1..150 chars, valid email format)
+//      - website: string (optional, 0..200 chars) - Official practice website URL
+//      - conventionSector: string (optional, 0..100 chars) - CPAM convention sector
+//      - acceptsCard: bool (optional) - Accepts credit card
+//      - acceptsCash: bool (optional) - Accepts cash
+//      - acceptsCheck: bool (optional) - Accepts check
+//      - acceptsTiersPayant: bool (optional) - Third-party payment support
+//      - acceptsCarteVitale: bool (optional) - Carte Vitale enabled
+//      - slotDuration: number (optional, 5..240 min) - Default appointment duration
+//      - teleconsultation: bool (optional) - Teleconsultation enabled
+//      - teleconsultationEnabled: bool (optional) - Video teleconsultation enabled
+//      - welcomeMessage: string (optional, 0..1000 chars) - Welcome announcement
+//      - schedule: list (optional, max 14 items) - Weekly schedule configurations
+//      - tarifs: list (optional, max 100 items) - Medical acts catalog & fees
+//      - degrees: list (optional, max 50 items) - University degrees & training
+//      - languages: list (optional, max 30 items) - Spoken languages
+//      - theme: string (optional, in ['blue', 'emerald', 'indigo', 'rose'])
+//      - darkMode: bool (optional) - UI dark mode preference
+//      - doctorId: string (optional, 1..100 chars, immutable)
+//      - role: string (optional, in ['doctor', 'patient'])
+//      - identityCardNumber: string (optional, 0..100 chars)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 2. Collection: appointments/{appointmentId}
+//    Document ID: appointmentId (e.g. 'rdv-101', auto-generated ID)
+//    Fields:
+//      - id: string (optional, 1..100 chars)
+//      - patientId: string (required, 1..100 chars, immutable) - Patient identifier
+//      - doctorId: string (optional, 1..100 chars, immutable) - Attending doctor identifier
+//      - patientName: string (required, 1..100 chars) - Patient full name
+//      - patientAge: number (optional, 0..130)
+//      - patientPhone: string (optional, 1..30 chars)
+//      - date: string (required, 4..30 chars, e.g. "YYYY-MM-DD")
+//      - time: string (required, 1..30 chars, e.g. "09:30")
+//      - endTime: string (optional, 1..30 chars)
+//      - duration: number (optional, 5..480 min)
+//      - type: string (required, in ['presentiel', 'teleconsultation', 'urgence', 'domicile', 'autre'])
+//      - reason: string (required, 1..500 chars) - Consultation reason
+//      - status: string (required, in ['confirmed', 'in_progress', 'waiting', 'completed', 'cancelled'])
+//      - badgeColor: string (optional, 1..30 chars)
+//      - notes: string (optional, 0..2000 chars) - Clinical notes / observations
+//      - amount: number (optional, 0..5000 EUR) - Consultation cost
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 3. Collection: conversations/{conversationId}
+//    Document ID: conversationId (e.g. 'conv-1', auto-generated ID)
+//    Fields:
+//      - id: string (optional, 1..100 chars)
+//      - patientId: string (required, 1..100 chars, immutable)
+//      - doctorId: string (optional, 1..100 chars, immutable)
+//      - patientName: string (required, 1..100 chars)
+//      - doctorName: string (optional, 0..100 chars)
+//      - avatar: string (optional, 0..1000000 chars, Base64 data URLs)
+//      - unreadCount: number (optional, 0..10000)
+//      - onlineStatus: string (optional, in ['online', 'offline', 'in_waiting_room', 'away'])
+//      - lastMessage: string (optional, 0..1000 chars)
+//      - lastTime: string (optional, 0..50 chars)
+//      - category: string (optional, 0..50 chars)
+//      - participants: list (optional, max 10 UIDs)
+//      - messages: list (optional, max 100 items, initial thread messages)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+//    Subcollection: conversations/{conversationId}/messages/{messageId}
+//    Document ID: messageId (e.g. 'm-101', auto-generated ID)
+//    Fields:
+//      - id: string (optional, 1..100 chars)
+//      - sender: string (required, in ['doctor', 'patient'], immutable)
+//      - senderId: string (optional, 1..100 chars, immutable)
+//      - senderName: string (required, 1..100 chars)
+//      - text: string (required, 1..5000 chars)
+//      - time: string (optional, 0..50 chars)
+//      - status: string (optional, in ['sent', 'delivered', 'read', 'unread'])
+//      - attachment: map (optional, keys: ['type', 'title', 'size', 'icon', 'url'])
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 4. Collection: patients/{patientId}
+//    Document ID: patientId (e.g. 'pat-1', patient UID)
+//    Fields:
+//      - id: string (optional, 1..100 chars, immutable)
+//      - patientId: string (optional, 1..100 chars, immutable)
+//      - uid: string (optional, 1..100 chars, immutable)
+//      - doctorId: string (optional, 1..100 chars)
+//      - name: string (required, 1..100 chars) - Patient full name
+//      - civility: string (optional, 0..100 chars)
+//      - firstName: string (optional, 0..100 chars)
+//      - lastName: string (optional, 0..100 chars)
+//      - birthDate: string (optional, 1..30 chars) - Date of birth
+//      - age: number (optional, 0..130)
+//      - gender: string (optional, in ['M', 'F', 'Autre', 'O'])
+//      - phone: string (optional, 1..30 chars)
+//      - email: string (optional, 1..150 chars, valid email format)
+//      - wilaya: string (optional, 0..100 chars)
+//      - city: string (optional, 0..100 chars)
+//      - identityCardNumber: string (optional, 0..100 chars)
+//      - bloodGroup: string (optional, in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Inconnu'])
+//      - weight: string or number (optional, <= 30 chars or 0..500)
+//      - height: string or number (optional, <= 30 chars or 0..300)
+//      - bmi: string or number (optional, <= 20 chars or 0..100)
+//      - bloodPressure: string (optional, 0..50 chars)
+//      - heartRate: number or string (optional, 0..300 or <= 30 chars)
+//      - bloodSugar: string (optional, 0..50 chars)
+//      - emergencyContact: map or string (optional, object with name, relation, phone or string)
+//      - role: string (optional, in ['patient', 'doctor'])
+//      - allergies: list (optional, max 50 items)
+//      - chronicConditions: list (optional, max 50 items)
+//      - currentTreatments: list (optional, max 50 items)
+//      - notes: string (optional, 0..5000 chars) - Medical history & private notes
+//      - avatar: string (optional, 0..1000000 chars, Base64 data URLs)
+//      - lastVisit: string (optional, 0..50 chars)
+//      - nextAppointment: string (optional, 0..50 chars)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Root Level Default Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions: Authentication & Role Authorization
+    // ===============================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user owns the resource (UID match)
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user is owner based on document's uid field
+    function isDocOwner() {
+      return isAuthenticated() && ('uid' in resource.data) && request.auth.uid == resource.data.uid;
+    }
+
+    // Verify UID hasn't been tampered with on create
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    // Ensure uid field is not modified on update
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    // Check if requester is a certified practitioner (doctor)
+    // Evaluates via Auth custom claims ('role' or 'isDoctor') or verified doctor profile document
+    function isDoctor() {
+      return isAuthenticated() && (
+        ('role' in request.auth.token && request.auth.token.role == 'doctor') ||
+        ('isDoctor' in request.auth.token && request.auth.token.isDoctor == true) ||
+        exists(/databases/$(database)/documents/doctors/$(request.auth.uid))
+      );
+    }
+
+    // Check if user is the practitioner owning the doctor record
+    function isDoctorOwner(doctorId) {
+      return isOwner(doctorId) || (doctorId == 'profile' && isDoctor());
+    }
+
+    // ===============================================================
+    // Helper Functions: Field Existence & Immutability
+    // ===============================================================
+
+    // Validate required fields exist in request payload
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that document contains ONLY allowed fields (strictly blocks schema pollution)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate that immutable fields remain strictly unchanged across updates
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Helper Functions: Types, Format & Resource Bounds (Anti-DoS)
+    // ===============================================================
+
+    // Validate non-empty string with min/max length bounds
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    // Validate optional string: if present, must be string within bounds or null
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    // Validate optional number: if present, must be number within value range or null
+    function isValidOptionalNumber(field, minVal, maxVal) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is number &&
+              request.resource.data[field] >= minVal &&
+              request.resource.data[field] <= maxVal);
+    }
+
+    // Validate optional boolean or null
+    function isValidOptionalBool(field) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is bool);
+    }
+
+    // Validate optional list with maximum element count or null
+    function isValidOptionalList(field, maxItems) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is list &&
+              request.resource.data[field].size() <= maxItems);
+    }
+
+    // Validate optional timestamp or null
+    function isValidOptionalTimestamp(field) {
+      return !(field in request.resource.data) ||
+             request.resource.data[field] == null ||
+             (request.resource.data[field] is timestamp);
+    }
+
+    // Validate URL format (http / https)
+    function isValidUrl(url) {
+      return url is string &&
+             url.size() <= 1000 &&
+             (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+             email.size() <= 150 &&
+             email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators: 1. Doctors ({doctorId})
+    // ===============================================================
+
+    function isValidDoctor(data) {
+      return hasOnlyAllowedFields([
+        'id', 'name', 'teleconsultation',
+        'civility', 'firstName', 'lastName', 'title', 'specialty', 'subSpecialties',
+        'rpps', 'adeli', 'bio', 'avatar', 'status', 'statusMessage',
+        'cabinetName', 'address', 'postalCode', 'city', 'wilaya', 'country', 'floor', 'doorCode',
+        'accessPmr', 'parking', 'phoneOffice', 'phoneEmergency', 'email', 'website',
+        'conventionSector', 'acceptsCard', 'acceptsCash', 'acceptsCheck', 'acceptsTiersPayant', 'acceptsCarteVitale',
+        'slotDuration', 'teleconsultationEnabled', 'welcomeMessage',
+        'schedule', 'tarifs', 'degrees', 'languages',
+        'theme', 'darkMode', 'doctorId', 'role', 'identityCardNumber', 'createdAt', 'updatedAt'
+      ]) &&
+      hasRequiredFields(['firstName', 'lastName', 'specialty']) &&
+      validStringLength('firstName', 1, 100) &&
+      validStringLength('lastName', 1, 100) &&
+      validStringLength('specialty', 1, 150) &&
+      isValidOptionalString('id', 0, 100) &&
+      isValidOptionalString('name', 0, 100) &&
+      isValidOptionalBool('teleconsultation') &&
+      isValidOptionalString('civility', 1, 20) &&
+      isValidOptionalString('title', 1, 200) &&
+      isValidOptionalList('subSpecialties', 30) &&
+      isValidOptionalString('rpps', 1, 30) &&
+      isValidOptionalString('adeli', 1, 30) &&
+      isValidOptionalString('bio', 0, 3000) &&
+      isValidOptionalString('avatar', 0, 1000000) &&
+      (!('status' in data) || data.status == null || data.status in ['available', 'in_consultation', 'away', 'offline']) &&
+      isValidOptionalString('statusMessage', 0, 200) &&
+      isValidOptionalString('cabinetName', 1, 200) &&
+      isValidOptionalString('address', 1, 300) &&
+      isValidOptionalString('postalCode', 1, 20) &&
+      isValidOptionalString('city', 1, 100) &&
+      isValidOptionalString('wilaya', 1, 100) &&
+      isValidOptionalString('country', 1, 100) &&
+      isValidOptionalString('floor', 0, 100) &&
+      isValidOptionalString('doorCode', 0, 50) &&
+      isValidOptionalBool('accessPmr') &&
+      isValidOptionalString('parking', 0, 300) &&
+      isValidOptionalString('phoneOffice', 0, 30) &&
+      isValidOptionalString('phoneEmergency', 0, 30) &&
+      (!('email' in data) || data.email == null || data.email == '' || isValidEmail(data.email)) &&
+      isValidOptionalString('website', 0, 200) &&
+      isValidOptionalString('conventionSector', 0, 100) &&
+      isValidOptionalBool('acceptsCard') &&
+      isValidOptionalBool('acceptsCash') &&
+      isValidOptionalBool('acceptsCheck') &&
+      isValidOptionalBool('acceptsTiersPayant') &&
+      isValidOptionalBool('acceptsCarteVitale') &&
+      isValidOptionalNumber('slotDuration', 5, 240) &&
+      isValidOptionalBool('teleconsultationEnabled') &&
+      isValidOptionalString('welcomeMessage', 0, 1000) &&
+      isValidOptionalList('schedule', 14) &&
+      isValidOptionalList('tarifs', 100) &&
+      isValidOptionalList('degrees', 50) &&
+      isValidOptionalList('languages', 30) &&
+      (!('theme' in data) || data.theme == null || data.theme in ['blue', 'emerald', 'indigo', 'rose']) &&
+      isValidOptionalBool('darkMode') &&
+      isValidOptionalString('doctorId', 1, 100) &&
+      (!('role' in data) || data.role == null || data.role in ['doctor', 'patient']) &&
+      isValidOptionalString('identityCardNumber', 0, 100) &&
+      isValidOptionalTimestamp('createdAt') &&
+      isValidOptionalTimestamp('updatedAt');
+    }
+
+    // ===============================================================
+    // Domain Validators: 2. Appointments ({appointmentId})
+    // ===============================================================
+
+    function isAppointmentDoctor(data) {
+      return isDoctor() || ('doctorId' in data && request.auth.uid == data.doctorId);
+    }
+
+    function isAppointmentPatient(data) {
+      return 'patientId' in data && request.auth.uid == data.patientId;
+    }
+
+    function canAccessAppointment(data) {
+      return isAppointmentDoctor(data) || isAppointmentPatient(data);
+    }
+
+    function canCreateAppointment(data) {
+      return (isDoctor() && (!('doctorId' in data) || request.auth.uid == data.doctorId)) ||
+             (request.auth.uid == data.patientId);
+    }
+
+    function isValidAppointment(data) {
+      return hasOnlyAllowedFields([
+        'id', 'patientId', 'doctorId', 'patientName', 'patientAge', 'patientPhone',
+        'date', 'time', 'endTime', 'duration', 'type', 'reason', 'status',
+        'badgeColor', 'notes', 'amount', 'createdAt', 'updatedAt'
+      ]) &&
+      hasRequiredFields(['patientId', 'patientName', 'date', 'time', 'type', 'reason', 'status']) &&
+      validStringLength('patientId', 1, 100) &&
+      validStringLength('patientName', 1, 100) &&
+      validStringLength('date', 4, 30) &&
+      validStringLength('time', 1, 30) &&
+      (data.type in ['presentiel', 'teleconsultation', 'urgence', 'domicile', 'autre']) &&
+      validStringLength('reason', 1, 500) &&
+      (data.status in ['confirmed', 'in_progress', 'waiting', 'completed', 'cancelled']) &&
+      isValidOptionalString('id', 1, 100) &&
+      isValidOptionalString('doctorId', 1, 100) &&
+      isValidOptionalNumber('patientAge', 0, 130) &&
+      isValidOptionalString('patientPhone', 1, 30) &&
+      isValidOptionalString('endTime', 1, 30) &&
+      isValidOptionalNumber('duration', 5, 480) &&
+      isValidOptionalString('badgeColor', 1, 30) &&
+      isValidOptionalString('notes', 0, 2000) &&
+      isValidOptionalNumber('amount', 0, 5000) &&
+      isValidOptionalTimestamp('createdAt') &&
+      isValidOptionalTimestamp('updatedAt');
+    }
+
+    // ===============================================================
+    // Domain Validators: 3. Conversations & Messages
+    // ===============================================================
+
+    function isConversationDoctor(data) {
+      return isDoctor() || ('doctorId' in data && request.auth.uid == data.doctorId);
+    }
+
+    function isConversationPatient(data) {
+      return 'patientId' in data && request.auth.uid == data.patientId;
+    }
+
+    function canAccessConversation(data) {
+      return isConversationDoctor(data) ||
+             isConversationPatient(data) ||
+             ('participants' in data && data.participants is list && request.auth.uid in data.participants);
+    }
+
+    function canCreateConversation(data) {
+      return (isDoctor() && (!('doctorId' in data) || request.auth.uid == data.doctorId)) ||
+             (request.auth.uid == data.patientId);
+    }
+
+    function isValidConversation(data) {
+      return hasOnlyAllowedFields([
+        'id', 'patientId', 'doctorId', 'patientName', 'doctorName', 'avatar', 'unreadCount',
+        'onlineStatus', 'lastMessage', 'lastTime', 'category', 'participants',
+        'messages', 'createdAt', 'updatedAt'
+      ]) &&
+      hasRequiredFields(['patientId', 'patientName']) &&
+      validStringLength('patientId', 1, 100) &&
+      validStringLength('patientName', 1, 100) &&
+      isValidOptionalString('id', 1, 100) &&
+      isValidOptionalString('doctorId', 1, 100) &&
+      isValidOptionalString('doctorName', 0, 100) &&
+      isValidOptionalString('avatar', 0, 1000000) &&
+      isValidOptionalNumber('unreadCount', 0, 10000) &&
+      (!('onlineStatus' in data) || data.onlineStatus in ['online', 'offline', 'in_waiting_room', 'away']) &&
+      isValidOptionalString('lastMessage', 0, 1000) &&
+      isValidOptionalString('lastTime', 0, 50) &&
+      isValidOptionalString('category', 0, 50) &&
+      isValidOptionalList('participants', 10) &&
+      isValidOptionalList('messages', 100) &&
+      isValidOptionalTimestamp('createdAt') &&
+      isValidOptionalTimestamp('updatedAt');
+    }
+
+    // Helper: Access parent conversation document for subcollection messages
+    function getParentConversation(convId) {
+      return get(/databases/$(database)/documents/conversations/$(convId)).data;
+    }
+
+    function canAccessParentConversation(convId) {
+      return exists(/databases/$(database)/documents/conversations/$(convId)) &&
+             canAccessConversation(getParentConversation(convId));
+    }
+
+    function isMessageAuthor(convId, data) {
+      return ('senderId' in data && request.auth.uid == data.senderId) ||
+             (data.sender == 'doctor' && isDoctor()) ||
+             (data.sender == 'patient' && request.auth.uid == getParentConversation(convId).patientId);
+    }
+
+    function isValidMessageSender(convId, data) {
+      return (!('senderId' in data) || request.auth.uid == data.senderId) &&
+             (data.sender == 'doctor' ? isDoctor() : true) &&
+             (data.sender == 'patient' ? request.auth.uid == getParentConversation(convId).patientId : true);
+    }
+
+    function isValidMessage(data) {
+      return hasOnlyAllowedFields([
+        'id', 'sender', 'senderId', 'senderName', 'text', 'time',
+        'status', 'attachment', 'createdAt', 'updatedAt'
+      ]) &&
+      hasRequiredFields(['sender', 'senderName', 'text']) &&
+      (data.sender in ['doctor', 'patient']) &&
+      validStringLength('senderName', 1, 100) &&
+      validStringLength('text', 1, 5000) &&
+      isValidOptionalString('id', 1, 100) &&
+      isValidOptionalString('senderId', 1, 100) &&
+      isValidOptionalString('time', 0, 50) &&
+      (!('status' in data) || data.status in ['sent', 'delivered', 'read', 'unread']) &&
+      isValidOptionalMessageAttachment(data) &&
+      isValidOptionalTimestamp('createdAt') &&
+      isValidOptionalTimestamp('updatedAt');
+    }
+
+    function isValidOptionalMessageAttachment(data) {
+      return !('attachment' in data) || (
+        data.attachment is map &&
+        data.attachment.keys().hasOnly(['type', 'title', 'size', 'icon', 'url']) &&
+        data.attachment.keys().hasAll(['title']) &&
+        data.attachment.title is string &&
+        data.attachment.title.size() >= 1 &&
+        data.attachment.title.size() <= 200 &&
+        (!('type' in data.attachment) || (data.attachment.type is string && data.attachment.type.size() <= 50)) &&
+        (!('size' in data.attachment) || (data.attachment.size is string && data.attachment.size.size() <= 50)) &&
+        (!('icon' in data.attachment) || (data.attachment.icon is string && data.attachment.icon.size() <= 50)) &&
+        (!('url' in data.attachment) || isValidUrl(data.attachment.url))
+      );
+    }
+
+    // ===============================================================
+    // Domain Validators: 4. Patients ({patientId})
+    // ===============================================================
+
+    function isPatientSelf(patientId, data) {
+      return request.auth.uid == patientId ||
+             ('uid' in data && request.auth.uid == data.uid) ||
+             ('patientId' in data && request.auth.uid == data.patientId);
+    }
+
+    function canAccessPatient(patientId, data) {
+      return isDoctor() || isPatientSelf(patientId, data);
+    }
+
+    function canCreatePatient(patientId, data) {
+      return isDoctor() || request.auth.uid == patientId;
+    }
+
+    function isValidOptionalEmergencyContact(data) {
+      return !('emergencyContact' in data) ||
+             (data.emergencyContact is string && data.emergencyContact.size() <= 300) ||
+             (data.emergencyContact is map &&
+              data.emergencyContact.keys().hasOnly(['name', 'relation', 'phone']) &&
+              (!('name' in data.emergencyContact) || (data.emergencyContact.name is string && data.emergencyContact.name.size() <= 100)) &&
+              (!('relation' in data.emergencyContact) || (data.emergencyContact.relation is string && data.emergencyContact.relation.size() <= 100)) &&
+              (!('phone' in data.emergencyContact) || (data.emergencyContact.phone is string && data.emergencyContact.phone.size() <= 50)));
+    }
+
+    function isValidPatient(data) {
+      return hasOnlyAllowedFields([
+        'id', 'patientId', 'uid', 'doctorId', 'name', 'civility', 'firstName', 'lastName',
+        'birthDate', 'age', 'gender', 'phone', 'email', 'wilaya', 'city',
+        'identityCardNumber', 'bloodGroup', 'weight', 'height', 'bmi',
+        'bloodPressure', 'heartRate', 'bloodSugar', 'emergencyContact', 'role',
+        'allergies', 'chronicConditions', 'currentTreatments', 'notes',
+        'avatar', 'lastVisit', 'nextAppointment', 'createdAt', 'updatedAt'
+      ]) &&
+      hasRequiredFields(['name']) &&
+      validStringLength('name', 1, 100) &&
+      isValidOptionalString('id', 1, 100) &&
+      isValidOptionalString('patientId', 1, 100) &&
+      isValidOptionalString('uid', 1, 100) &&
+      isValidOptionalString('doctorId', 1, 100) &&
+      isValidOptionalString('civility', 0, 100) &&
+      isValidOptionalString('firstName', 0, 100) &&
+      isValidOptionalString('lastName', 0, 100) &&
+      isValidOptionalString('wilaya', 0, 100) &&
+      isValidOptionalString('city', 0, 100) &&
+      isValidOptionalString('identityCardNumber', 0, 100) &&
+      isValidOptionalString('birthDate', 1, 30) &&
+      isValidOptionalNumber('age', 0, 130) &&
+      (!('gender' in data) || data.gender == null || data.gender in ['M', 'F', 'Autre', 'O']) &&
+      isValidOptionalString('phone', 1, 30) &&
+      (!('email' in data) || data.email == null || data.email == '' || isValidEmail(data.email)) &&
+      (!('bloodGroup' in data) || data.bloodGroup == null || data.bloodGroup in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Inconnu']) &&
+      (!('weight' in data) || data.weight == null || (data.weight is string && data.weight.size() <= 30) || (data.weight is number && data.weight >= 0 && data.weight <= 500)) &&
+      (!('height' in data) || data.height == null || (data.height is string && data.height.size() <= 30) || (data.height is number && data.height >= 0 && data.height <= 300)) &&
+      (!('bmi' in data) || data.bmi == null || (data.bmi is string && data.bmi.size() <= 20) || (data.bmi is number && data.bmi >= 0 && data.bmi <= 100)) &&
+      isValidOptionalString('bloodPressure', 0, 50) &&
+      (!('heartRate' in data) || data.heartRate == null || (data.heartRate is string && data.heartRate.size() <= 30) || (data.heartRate is number && data.heartRate >= 0 && data.heartRate <= 300)) &&
+      isValidOptionalString('bloodSugar', 0, 50) &&
+      isValidOptionalEmergencyContact(data) &&
+      (!('role' in data) || (data.role is string && data.role in ['patient', 'doctor'])) &&
+      isValidOptionalList('allergies', 50) &&
+      isValidOptionalList('chronicConditions', 50) &&
+      isValidOptionalList('currentTreatments', 50) &&
+      isValidOptionalString('notes', 0, 5000) &&
+      isValidOptionalString('avatar', 0, 1000000) &&
+      isValidOptionalString('lastVisit', 0, 50) &&
+      isValidOptionalString('nextAppointment', 0, 50) &&
+      isValidOptionalTimestamp('createdAt') &&
+      isValidOptionalTimestamp('updatedAt');
+    }
+
+    // ===============================================================
+    // Rules Definition
+    // ===============================================================
+
+    // 1. Doctors Collection
+    // Public read for practitioner card (name, specialty, schedule, address, tarifs).
+    // Write permitted for the doctor owner, authenticated practitioner with matching UID, or the legacy 'profile' document.
+    match /doctors/{doctorId} {
+      allow read: if true;
+      allow create: if (isDoctorOwner(doctorId) || (isAuthenticated() && request.auth.uid == doctorId) || (doctorId == 'profile')) &&
+                    isValidDoctor(request.resource.data);
+      allow update: if (isDoctorOwner(doctorId) || (isAuthenticated() && request.auth.uid == doctorId) || (doctorId == 'profile')) &&
+                    isValidDoctor(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['doctorId', 'createdAt']);
+      allow delete: if isDoctorOwner(doctorId) || (isAuthenticated() && request.auth.uid == doctorId) || (doctorId == 'profile');
+    }
+
+    // Doctors Directory Collection (Public practitioner directory for patient search)
+    match /medidoc_doctors_directory/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 2. Appointments Collection
+    // Appointments scheduled with the doctor.
+    // Read/write granted to the attending doctor or the specific patient whose UID matches patientId.
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && canAccessAppointment(resource.data);
+      allow create: if isAuthenticated() && canCreateAppointment(request.resource.data) &&
+                    isValidAppointment(request.resource.data);
+      allow update: if isAuthenticated() && canAccessAppointment(resource.data) &&
+                    isValidAppointment(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['patientId', 'doctorId', 'createdAt']);
+      allow delete: if isAuthenticated() && canAccessAppointment(resource.data);
+    }
+
+    // 3. Conversations & Messages Collection
+    // Doctor-patient secure messaging channel.
+    // Accessible strictly by the practitioner or the patient participating in the conversation.
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated() && canAccessConversation(resource.data);
+      allow create: if isAuthenticated() && canCreateConversation(request.resource.data) &&
+                    isValidConversation(request.resource.data);
+      allow update: if isAuthenticated() && canAccessConversation(resource.data) &&
+                    isValidConversation(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['patientId', 'doctorId', 'createdAt']);
+      allow delete: if isAuthenticated() && (isDoctor() || (request.auth.uid == resource.data.patientId));
+
+      // Messages Subcollection
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && canAccessParentConversation(conversationId);
+        allow create: if isAuthenticated() && canAccessParentConversation(conversationId) &&
+                      isValidMessage(request.resource.data) &&
+                      isValidMessageSender(conversationId, request.resource.data);
+        allow update: if isAuthenticated() && canAccessParentConversation(conversationId) &&
+                      isValidMessage(request.resource.data) &&
+                      areImmutableFieldsUnchanged(['sender', 'senderId', 'createdAt']);
+        allow delete: if isAuthenticated() && canAccessParentConversation(conversationId) &&
+                      (isDoctor() || isMessageAuthor(conversationId, resource.data));
+      }
+    }
+
+    // 4. Patients Collection
+    // Sensitive health records, medical notes, allergies, chronic conditions, biometric data.
+    // Strictly accessible by the certified doctor or the specific patient themselves.
+    match /patients/{patientId} {
+      allow read: if isAuthenticated() && canAccessPatient(patientId, resource.data);
+      allow create: if isAuthenticated() && canCreatePatient(patientId, request.resource.data) &&
+                    isValidPatient(request.resource.data);
+      allow update: if isAuthenticated() && canAccessPatient(patientId, resource.data) &&
+                    isValidPatient(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['id', 'patientId', 'uid', 'createdAt']);
+      allow delete: if isAuthenticated() && (isDoctor() || isPatientSelf(patientId, resource.data));
+    }
+
+  }
+}
