@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "drzone-ad80f",
     "public": ".",
     "ignore": [
       "firebase.json",
