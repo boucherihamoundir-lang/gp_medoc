@@ -475,13 +475,19 @@ const app = createApp({
         : (doctor.value.id || 'doc_current');
       const docSenderName = `${doctor.value.civility || 'Dr.'} ${doctor.value.firstName || ''} ${doctor.value.lastName || ''}`.trim() || 'Docteur';
 
+      // Identifiant unifié et déterministe de la conversation : conv_{doctorId}_{patientId}
+      const patId = activeConversation.value.patientId || 'pat-1';
+      const convId = `conv_${docSenderId}_${patId}`;
+      activeConversation.value.id = convId;
+
       const newMsg = {
-        id: `m-${Date.now()}`,
+        id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         sender: 'doctor',
         senderId: docSenderId,
         senderName: docSenderName,
         text: newMessageText.value.trim(),
         time: timeStr,
+        timestamp: Date.now(),
         status: 'sent'
       };
 
@@ -496,18 +502,20 @@ const app = createApp({
       saveDoctorDataLocally();
 
       // Synchroniser avec Firestore en temps réel
-      if (window.db && activeConversation.value.id) {
+      if (window.db) {
         try {
-          await window.db.collection('conversations').doc(activeConversation.value.id).set({
-            id: activeConversation.value.id,
-            patientId: activeConversation.value.patientId,
+          await window.db.collection('conversations').doc(convId).set({
+            id: convId,
+            patientId: patId,
             patientName: activeConversation.value.patientName || 'Patient',
             doctorId: docSenderId,
             doctorName: docSenderName,
             avatar: activeConversation.value.avatar || '',
-            lastMessage: activeConversation.value.lastMessage,
-            lastTime: activeConversation.value.lastTime,
-            messages: activeConversation.value.messages.slice(-50),
+            lastMessage: newMsg.text,
+            lastTime: timeStr,
+            unreadCount: firebase.firestore.FieldValue.increment(1),
+            onlineStatus: 'online',
+            messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         } catch (err) {
@@ -547,13 +555,18 @@ const app = createApp({
         };
       }
 
+      const patId = activeConversation.value.patientId || 'pat-1';
+      const convId = `conv_${docSenderId}_${patId}`;
+      activeConversation.value.id = convId;
+
       const newMsg = {
-        id: `m-${Date.now()}`,
+        id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         sender: 'doctor',
         senderId: docSenderId,
         senderName: docSenderName,
         text: `Veuillez trouver ci-joint votre document médical officiel : ${attachmentInfo.title}`,
         time: timeStr,
+        timestamp: Date.now(),
         status: 'sent',
         attachment: attachmentInfo
       };
@@ -567,18 +580,20 @@ const app = createApp({
 
       saveDoctorDataLocally();
 
-      if (window.db && activeConversation.value.id) {
+      if (window.db) {
         try {
-          await window.db.collection('conversations').doc(activeConversation.value.id).set({
-            id: activeConversation.value.id,
-            patientId: activeConversation.value.patientId,
+          await window.db.collection('conversations').doc(convId).set({
+            id: convId,
+            patientId: patId,
             patientName: activeConversation.value.patientName || 'Patient',
             doctorId: docSenderId,
             doctorName: docSenderName,
             avatar: activeConversation.value.avatar || '',
             lastMessage: activeConversation.value.lastMessage,
             lastTime: activeConversation.value.lastTime,
-            messages: activeConversation.value.messages.slice(-50),
+            unreadCount: firebase.firestore.FieldValue.increment(1),
+            onlineStatus: 'online',
+            messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         } catch (err) {
@@ -603,20 +618,31 @@ const app = createApp({
 
         query.onSnapshot((snapshot) => {
           if (!snapshot) return;
-          snapshot.docChanges().forEach((change) => {
-            const data = change.doc.data();
-            const convId = change.doc.id;
-            let existing = conversations.value.find(c => c.id === convId || (c.patientId && c.patientId === data.patientId));
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const convId = docSnap.id;
+            let existing = conversations.value.find(c => c.id === convId || (c.patientId === data.patientId && c.doctorId === data.doctorId));
             if (existing) {
+              existing.id = convId;
               if (data.messages && Array.isArray(data.messages)) {
                 existing.messages = data.messages;
               }
               existing.lastMessage = data.lastMessage || existing.lastMessage;
               existing.lastTime = data.lastTime || existing.lastTime;
+              existing.unreadCount = data.unreadCount || 0;
+
+              // Mettre à jour la conversation active en temps réel
+              if (activeConversation.value && (activeConversation.value.id === convId || activeConversation.value.patientId === data.patientId)) {
+                activeConversation.value.messages = data.messages || [];
+                activeConversation.value.lastMessage = data.lastMessage;
+                activeConversation.value.lastTime = data.lastTime;
+              }
             } else {
-              conversations.value.unshift({
+              const newConv = {
                 id: convId,
                 patientId: data.patientId || 'pat-patient',
+                doctorId: data.doctorId || docId,
+                doctorName: data.doctorName || `${doctor.value.civility || 'Dr.'} ${doctor.value.lastName || ''}`,
                 patientName: data.patientName || 'Patient',
                 avatar: data.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
                 unreadCount: 1,
@@ -625,7 +651,11 @@ const app = createApp({
                 lastTime: data.lastTime || 'À l\'instant',
                 category: data.category || 'suivi',
                 messages: data.messages || []
-              });
+              };
+              conversations.value.unshift(newConv);
+              if (!activeConversationId.value) {
+                activeConversationId.value = convId;
+              }
               notify('Nouveau message patient', `${data.patientName || 'Un patient'} vous a envoyé un message.`, 'info');
             }
           });
@@ -639,29 +669,32 @@ const app = createApp({
     };
 
     const openChatWithPatient = (patientId) => {
-      let conv = conversations.value.find(c => c.patientId === patientId);
+      const docSenderId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+        ? firebase.auth().currentUser.uid
+        : (doctor.value.id || 'doc_current');
+      const expectedConvId = `conv_${docSenderId}_${patientId}`;
+
+      let conv = conversations.value.find(c => c.id === expectedConvId || c.patientId === patientId);
       if (!conv) {
-        const patient = patients.value.find(p => p.id === patientId);
-        if (patient) {
-          conv = {
-            id: `conv-${Date.now()}`,
-            patientId: patient.id,
-            patientName: patient.name,
-            avatar: patient.avatar,
-            unreadCount: 0,
-            onlineStatus: 'online',
-            lastMessage: 'Discussion ouverte',
-            lastTime: 'À l\'instant',
-            category: 'suivi',
-            messages: []
-          };
-          conversations.value.unshift(conv);
-        }
+        const patient = patients.value.find(p => p.id === patientId || p.uid === patientId);
+        conv = {
+          id: expectedConvId,
+          patientId: patientId,
+          doctorId: docSenderId,
+          doctorName: `${doctor.value.civility || 'Dr.'} ${doctor.value.lastName || ''}`.trim() || 'Docteur',
+          patientName: patient ? patient.name : 'Patient',
+          avatar: patient ? patient.avatar : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+          unreadCount: 0,
+          onlineStatus: 'online',
+          lastMessage: 'Discussion ouverte',
+          lastTime: 'À l\'instant',
+          category: 'suivi',
+          messages: []
+        };
+        conversations.value.unshift(conv);
       }
-      if (conv) {
-        activeConversationId.value = conv.id;
-        activeTab.value = 'chat';
-      }
+      activeConversationId.value = conv.id;
+      activeTab.value = 'chat';
     };
 
     // --- ORDONNANCES EXPRESS ---
@@ -713,16 +746,34 @@ const app = createApp({
           }
 
           loadDataFromFirebase();
-          setTimeout(() => listenToConversationsInFirestore(), 500);
+          setTimeout(() => {
+            listenToConversationsInFirestore();
+            listenToPatientsInFirestore();
+            listenToAppointmentsInFirestore();
+          }, 500);
 
           if (firebase.auth) {
-            firebase.auth().onAuthStateChanged((user) => {
+            firebase.auth().onAuthStateChanged(async (user) => {
               if (user) {
+                // Vérifier si le compte connecté est un patient
+                if (window.db) {
+                  try {
+                    const patSnap = await window.db.collection('patients').doc(user.uid).get();
+                    if (patSnap.exists && patSnap.data().role === 'patient') {
+                      await firebase.auth().signOut();
+                      isAuthenticated.value = false;
+                      localStorage.removeItem('medidoc_auth');
+                      return;
+                    }
+                  } catch (e) {}
+                }
                 doctor.value.id = user.uid;
                 if (user.email && !doctor.value.email) doctor.value.email = user.email;
                 saveDoctorDataLocally();
                 loadDataFromFirebase();
                 listenToConversationsInFirestore();
+                listenToPatientsInFirestore();
+                listenToAppointmentsInFirestore();
               }
             });
           }
@@ -817,6 +868,74 @@ const app = createApp({
         }
       } catch (err) {
         console.warn('Impossible de charger depuis Firestore, utilisation du cache local:', err);
+      }
+    };
+
+    const listenToPatientsInFirestore = () => {
+      if (!window.db) return;
+      try {
+        window.db.collection('patients').onSnapshot((snapshot) => {
+          if (!snapshot) return;
+          const list = [];
+          snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            list.push({
+              id: docSnap.id,
+              uid: docSnap.id,
+              name: d.name || `${d.firstName || ''} ${d.lastName || ''}`.trim() || 'Patient',
+              civility: d.civility || '',
+              firstName: d.firstName || '',
+              lastName: d.lastName || '',
+              age: d.age || (d.birthDate ? (new Date().getFullYear() - new Date(d.birthDate).getFullYear()) : 30),
+              gender: d.gender || 'M',
+              bloodGroup: d.bloodGroup || 'O+',
+              phone: d.phone || '',
+              email: d.email || '',
+              wilaya: d.wilaya || '',
+              city: d.city || '',
+              avatar: d.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+              chronicConditions: d.chronicConditions || [],
+              allergies: d.allergies || []
+            });
+          });
+          if (list.length > 0) {
+            patients.value = list;
+            localStorage.setItem('medidoc_patients', JSON.stringify(list));
+          }
+        }, err => {
+          console.warn('Erreur écoute patients Firestore:', err.message);
+        });
+      } catch (err) {
+        console.warn('Erreur init listener patients:', err);
+      }
+    };
+
+    const listenToAppointmentsInFirestore = () => {
+      if (!window.db) return;
+      try {
+        const docId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+          ? firebase.auth().currentUser.uid
+          : (doctor.value.id || null);
+
+        let query = window.db.collection('appointments');
+        if (docId) {
+          query = query.where('doctorId', '==', docId);
+        }
+        query.onSnapshot((snapshot) => {
+          if (!snapshot) return;
+          const list = [];
+          snapshot.forEach(docSnap => {
+            list.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          if (list.length > 0) {
+            appointments.value = list;
+            localStorage.setItem('medidoc_appointments', JSON.stringify(list));
+          }
+        }, err => {
+          console.warn('Erreur écoute RDV Firestore:', err.message);
+        });
+      } catch (err) {
+        console.warn('Erreur init listener RDV:', err);
       }
     };
 
@@ -1082,7 +1201,20 @@ const app = createApp({
         if (typeof firebase !== 'undefined' && firebase.auth && FIREBASE_CONFIG.apiKey) {
           const userCred = await firebase.auth().signInWithEmailAndPassword(email, pwd);
           if (userCred.user) {
-            doctor.value.id = userCred.user.uid;
+            const uid = userCred.user.uid;
+            // Vérification stricte du rôle : refuser si c'est un compte patient
+            if (window.db) {
+              try {
+                const patSnap = await window.db.collection('patients').doc(uid).get();
+                if (patSnap.exists && patSnap.data().role === 'patient') {
+                  await firebase.auth().signOut();
+                  throw new Error("Ce compte est un compte PATIENT. Veuillez vous connecter depuis l'Espace Patient.");
+                }
+              } catch (checkErr) {
+                if (checkErr.message.includes('PATIENT')) throw checkErr;
+              }
+            }
+            doctor.value.id = uid;
           }
         }
 
@@ -1094,6 +1226,8 @@ const app = createApp({
         if (firebaseConnected.value && window.db) {
           await loadDataFromFirebase();
           listenToConversationsInFirestore();
+          listenToPatientsInFirestore();
+          listenToAppointmentsInFirestore();
         }
 
         notify('Connexion réussie !', `Bienvenue ${doctor.value.civility} ${doctor.value.lastName}`, 'success');
@@ -1246,6 +1380,8 @@ const app = createApp({
       connectToFirebase,
       disconnectFirebase,
       listenToConversationsInFirestore,
+      listenToPatientsInFirestore,
+      listenToAppointmentsInFirestore,
       firebaseConfig,
       showFirebaseModal,
       firebaseConnected,
