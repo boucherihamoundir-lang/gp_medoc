@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MEDOC - Espace Patient & Santé Connectée</title>
   <link rel="icon" type="image/png" href="logo.png">
+  <!-- PWA & Mobile Capabilities -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0284c7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MEDOC">
+  <link rel="apple-touch-icon" href="icon-192.png">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -1795,5 +1803,16 @@
 <script src="firebase-config.js"></script>
 <script src="patient-app.js"></script>
 
+
+<!-- Service Worker Registration for PWA -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('MEDOC Service Worker registered:', reg.scope))
+        .catch(err => console.error('MEDOC Service Worker registration failed:', err));
+    });
+  }
+</script>
 </body>
 </html>

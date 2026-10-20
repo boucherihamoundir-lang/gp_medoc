@@ -6,6 +6,15 @@
   <title>MEDOC - Portail Médical & Santé Connectée | Choisissez votre espace</title>
   <link rel="icon" type="image/png" href="logo.png">
   
+  <!-- PWA & Mobile Capabilities -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0284c7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MEDOC">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -70,6 +79,16 @@
           class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition"
           title="Basculer le mode sombre / clair">
           <i :class="darkMode ? 'fa-solid fa-sun text-amber-400' : 'fa-solid fa-moon text-slate-600'"></i>
+        </button>
+
+        <!-- Install PWA Button (PC & Mobile) -->
+        <button 
+          v-if="canInstall"
+          @click="installPWA" 
+          class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 rounded-xl shadow-md shadow-sky-600/25 transition cursor-pointer"
+          title="Installer l'application MEDOC">
+          <i class="fa-solid fa-circle-down"></i>
+          <span>Installer l'App</span>
         </button>
 
         <!-- Direct Nav Buttons -->
@@ -336,13 +355,38 @@
   createApp({
     data() {
       return {
-        darkMode: localStorage.getItem('medidoc_dark_mode') === 'true'
+        darkMode: localStorage.getItem('medidoc_dark_mode') === 'true',
+        deferredPrompt: null,
+        canInstall: false
       };
     },
     mounted() {
       this.applyDarkMode();
+
+      // Listen for PWA install prompt
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        this.deferredPrompt = e;
+        this.canInstall = true;
+      });
+
+      window.addEventListener('appinstalled', () => {
+        this.canInstall = false;
+        this.deferredPrompt = null;
+        console.log('MEDOC application successfully installed');
+      });
     },
     methods: {
+      async installPWA() {
+        if (!this.deferredPrompt) return;
+        this.deferredPrompt.prompt();
+        const { outcome } = await this.deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          console.log('User accepted MEDOC installation');
+        }
+        this.deferredPrompt = null;
+        this.canInstall = false;
+      },
       toggleDarkMode() {
         this.darkMode = !this.darkMode;
         localStorage.setItem('medidoc_dark_mode', this.darkMode);
@@ -357,6 +401,17 @@
       }
     }
   }).mount('#portal-app');
+</script>
+
+<!-- Service Worker Registration for PWA -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('MEDOC Service Worker registered:', reg.scope))
+        .catch(err => console.error('MEDOC Service Worker registration failed:', err));
+    });
+  }
 </script>
 
 </body>
