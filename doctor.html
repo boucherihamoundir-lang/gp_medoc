@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MEDOC - Services de Santé Innovants</title>
   <link rel="icon" type="image/png" href="logo.png">
+  
   <!-- PWA & Mobile Capabilities -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
@@ -137,10 +138,10 @@
 
         <!-- Doctor Avatar Quick Info & Logout Button (When logged in) -->
         <div v-if="isAuthenticated" class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-          <img 
-            :src="doctor.avatar" 
-            :alt="doctor.lastName" 
-            class="w-9 h-9 rounded-xl object-cover ring-2 ring-sky-500/20 shadow-sm">
+          <div class="w-9 h-9 rounded-xl overflow-hidden ring-2 ring-sky-500/20 shadow-sm flex-shrink-0">
+            <img v-if="doctor.avatar" :src="doctor.avatar" :alt="doctor.lastName" class="w-full h-full object-cover">
+            <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-lg">{{ (doctor.firstName||'D')[0] }}{{ (doctor.lastName||'R')[0] }}</div>
+          </div>
           <div class="hidden xl:block text-left">
             <div class="text-xs font-bold leading-tight">{{ doctor.civility }} {{ doctor.firstName }} {{ doctor.lastName }}</div>
             <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{{ doctor.specialty }}</div>
@@ -170,9 +171,6 @@
   <!-- ==================== AUTHENTICATION & INSCRIPTION SCREEN (SMS OTP) ==================== -->
   <div v-if="!isAuthenticated" class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-100 via-sky-50 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
     <div class="max-w-xl w-full bg-white/95 dark:bg-slate-900/95 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden glass-auth-card my-6">
-      
-      <!-- Drapeau algérien -->
-      <div class="h-2 w-full" style="background: linear-gradient(to right, #006233 50%, #ffffff 50%, #ffffff 70%, #d21034 70%)"></div>
       <div class="bg-gradient-to-r from-blue-700 via-sky-600 to-indigo-700 p-6 text-white text-center relative">
         <div class="w-20 h-20 mx-auto rounded-3xl bg-white p-2 shadow-2xl mb-3 flex items-center justify-center border border-white/20">
           <img src="logo.png" alt="MEDOC" class="w-full h-full object-contain">
@@ -558,7 +556,7 @@
                 @click="resendOtp" 
                 :class="authOtpTimer > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-sky-600 font-bold hover:underline'">
                 <span v-if="authOtpTimer > 0">Renvoyer dans {{ authOtpTimer }}s</span>
-                <span v-else>Renvoyer le code SMS</span>
+                <span v-else>check your sms</span>
               </button>
             </div>
           </div>
@@ -927,10 +925,10 @@
       <!-- ========================================================================= -->
       <!-- VIEW 2: BOÎTE DE CONVERSATION & MESSAGERIE PATIENTS                      -->
       <!-- ========================================================================= -->
-      <div v-if="activeTab === 'chat'" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col md:flex-row h-[750px]">
+      <div v-if="activeTab === 'chat'" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col md:flex-row h-[calc(100dvh-150px)] min-h-[520px] max-h-[820px]">
         
         <!-- COLUMN 1: CONVERSATIONS LIST -->
-        <div class="w-full md:w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full bg-slate-50/50 dark:bg-slate-900/50">
+        <div :class="activeConversationId ? 'hidden md:flex' : 'flex'" class="w-full md:w-80 border-r border-slate-200 dark:border-slate-800 flex-col h-full bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0">
           
           <!-- Search in conversations -->
           <div class="p-3 border-b border-slate-200 dark:border-slate-800">
@@ -945,6 +943,11 @@
 
           <!-- Conversations scroll list -->
           <div class="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+            <div v-if="conversations.length === 0" class="p-8 text-center text-slate-400 text-xs space-y-2">
+              <i class="fa-regular fa-comment-dots text-3xl opacity-40"></i>
+              <p class="font-semibold text-slate-600 dark:text-slate-300">Aucune conversation</p>
+              <p class="text-[11px] leading-relaxed">Les messages de vos patients apparaîtront ici automatiquement en temps réel.</p>
+            </div>
             <div 
               v-for="conv in conversations" 
               :key="conv.id"
@@ -954,7 +957,8 @@
               
               <!-- Avatar with status dot -->
               <div class="relative flex-shrink-0">
-                <img :src="conv.avatar" :alt="conv.patientName" class="w-10 h-10 rounded-xl object-cover">
+                <img v-if="conv.avatar" :src="conv.avatar" :alt="conv.patientName" class="w-10 h-10 rounded-xl object-cover">
+                <div v-else class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-sm">{{ (conv.patientName||'P')[0] }}</div>
                 <span 
                   v-if="conv.onlineStatus === 'online'" 
                   class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
@@ -985,12 +989,24 @@
         </div>
 
         <!-- COLUMN 2: ACTIVE CHAT THREAD -->
-        <div class="flex-1 flex flex-col h-full bg-white dark:bg-slate-900">
+        <div :class="activeConversationId ? 'flex' : 'hidden md:flex'" class="flex-1 flex-col h-full bg-white dark:bg-slate-900 overflow-hidden">
+          <div v-if="!activeConversation" class="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-3">
+            <div class="w-16 h-16 rounded-3xl bg-sky-50 dark:bg-slate-800 flex items-center justify-center text-sky-600 text-2xl shadow-sm">
+              <i class="fa-solid fa-comments"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Messagerie instantanée médicale</h3>
+            <p class="text-xs text-slate-400 max-w-sm">Sélectionnez une discussion à gauche pour échanger en direct avec vos patients, ou attendez un message entrant.</p>
+          </div>
           
+          <div v-else class="flex-1 flex flex-col h-full">
           <!-- Chat Header -->
-          <div v-if="activeConversation" class="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900/30">
-            <div class="flex items-center gap-3">
-              <img :src="activeConversation.avatar" :alt="activeConversation.patientName" class="w-9 h-9 rounded-xl object-cover">
+          <div class="p-3 sm:p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/30 dark:bg-slate-900/30 flex-shrink-0">
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button @click="activeConversationId = null" class="md:hidden p-2 -ml-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition flex-shrink-0" title="Retour aux discussions"><i class="fa-solid fa-arrow-left text-sm"></i></button>
+              <div class="w-9 h-9 rounded-xl overflow-hidden">
+              <img v-if="activeConversation.avatar" :src="activeConversation.avatar" :alt="activeConversation.patientName" class="w-full h-full object-cover">
+              <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-sm">{{ (activeConversation.patientName||'P')[0] }}</div>
+            </div>
               <div>
                 <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <span>{{ activeConversation.patientName }}</span>
@@ -1023,7 +1039,7 @@
           </div>
 
           <!-- Messages Thread Container -->
-          <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-950/30">
+          <div id="doctorChatScrollContainer" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-950/30">
             
             <div v-if="!activeConversation || activeConversation.messages.length === 0" class="text-center py-12 text-slate-400 text-xs">
               <i class="fa-regular fa-comment-dots text-3xl mb-2"></i>
@@ -1037,14 +1053,14 @@
               class="flex items-end gap-2">
               
               <!-- Patient avatar if patient msg -->
-              <img 
-                v-if="msg.sender === 'patient'" 
-                :src="activeConversation.avatar" 
-                class="w-7 h-7 rounded-lg object-cover mb-1">
+              <div v-if="msg.sender === 'patient'" class="w-7 h-7 rounded-lg overflow-hidden mb-1 flex-shrink-0">
+              <img v-if="activeConversation.avatar" :src="activeConversation.avatar" class="w-full h-full object-cover">
+              <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-xs">{{ (activeConversation.patientName||'P')[0] }}</div>
+            </div>
 
               <div 
                 :class="msg.sender === 'doctor' ? 'bg-sky-600 text-white rounded-2xl chat-bubble-doctor shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl chat-bubble-patient border border-slate-200 dark:border-slate-700 shadow-sm'"
-                class="max-w-md p-3.5 space-y-1.5">
+                class="max-w-[85%] sm:max-w-md p-3 sm:p-3.5 space-y-1 sm:space-y-1.5">
                 
                 <div class="flex items-center justify-between gap-4 text-[10px]" :class="msg.sender === 'doctor' ? 'text-sky-100' : 'text-slate-400'">
                   <span class="font-bold">{{ msg.senderName }}</span>
@@ -1107,13 +1123,17 @@
               </button>
             </form>
           </div>
+          </div>
 
         </div>
 
         <!-- COLUMN 3: CLINICAL SUMMARY SIDEBAR (RIGHT) -->
         <div v-if="activePatientDetails" class="hidden xl:block w-72 border-l border-slate-200 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50 overflow-y-auto">
           <div class="text-center pb-4 border-b border-slate-200 dark:border-slate-800">
-            <img :src="activePatientDetails.avatar" class="w-16 h-16 rounded-2xl mx-auto object-cover ring-2 ring-sky-500/20 shadow-sm mb-2">
+            <div class="w-16 h-16 rounded-2xl mx-auto overflow-hidden ring-2 ring-sky-500/20 shadow-sm mb-2">
+            <img v-if="activePatientDetails.avatar" :src="activePatientDetails.avatar" class="w-full h-full object-cover">
+            <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-lg">{{ (activePatientDetails.name||'P')[0] }}</div>
+          </div>
             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ activePatientDetails.name }}</h3>
             <p class="text-xs text-slate-500">{{ activePatientDetails.age }} ans • {{ activePatientDetails.gender === 'F' ? 'Femme' : 'Homme' }}</p>
             <p class="text-[11px] text-slate-400 mt-1 font-mono">{{ activePatientDetails.phone }}</p>
@@ -1222,27 +1242,19 @@
             
             <!-- Photo Picker Column -->
             <div class="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700">
-              <img :src="doctor.avatar" class="w-24 h-24 rounded-2xl object-cover ring-4 ring-sky-500/20 shadow-md mb-3">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Photo de profil</span>
-              <p class="text-[11px] text-slate-400 text-center mb-3">Choisissez un avatar ou saisissez une URL</p>
-              
-              <!-- Presets -->
-              <div class="flex gap-1.5 justify-center mb-2">
-                <button 
-                  v-for="(preset, i) in avatarPresets" 
-                  :key="i"
-                  @click="selectAvatarPreset(preset.url)"
-                  class="w-7 h-7 rounded-lg overflow-hidden ring-1 ring-slate-300 hover:ring-2 hover:ring-sky-500 transition">
-                  <img :src="preset.url" class="w-full h-full object-cover">
-                </button>
-              </div>
+              <div class="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-sky-500/20 shadow-md mb-3">
+              <img v-if="doctor.avatar" :src="doctor.avatar" class="w-full h-full object-cover">
+              <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-3xl">{{ (doctor.firstName||'D')[0] }}{{ (doctor.lastName||'R')[0] }}</div>
+            </div>
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Photo de profil</span>
+              <p class="text-[11px] text-slate-400 text-center mb-3">Importez votre photo depuis votre appareil. Elle sera sauvegardée dans Firebase.</p>
 
-              <!-- Custom URL input -->
-              <input 
-                type="text" 
-                v-model="doctor.avatar" 
-                placeholder="URL photo personnalisée..." 
-                class="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <!-- Upload depuis appareil uniquement -->
+              <label class="w-full py-2 px-3 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 rounded-xl border border-sky-200 dark:border-sky-800 text-xs font-bold text-center cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/60 transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-camera-retro"></i>
+                <span>📷 Choisir depuis l'appareil</span>
+                <input type="file" accept="image/*" @change="handleDoctorPfpUpload" class="hidden">
+              </label>
             </div>
 
             <!-- Form fields -->
@@ -1504,7 +1516,10 @@
             
             <div class="flex items-start justify-between">
               <div class="flex items-center gap-3">
-                <img :src="p.avatar" class="w-12 h-12 rounded-xl object-cover shadow-sm">
+                <div class="w-12 h-12 rounded-xl overflow-hidden shadow-sm flex-shrink-0">
+                <img v-if="p.avatar" :src="p.avatar" class="w-full h-full object-cover">
+                <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-sm">{{ (p.name||'P')[0] }}</div>
+              </div>
                 <div>
                   <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ p.name }}</h3>
                   <div class="text-xs text-slate-500">{{ p.birthDate }} ({{ p.age }} ans) • {{ p.gender === 'F' ? 'Femme' : 'Homme' }}</div>
@@ -1581,7 +1596,10 @@
           <div class="px-6 sm:px-8 pb-8 relative -mt-16">
             <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-6">
               <div class="flex items-end gap-4">
-                <img :src="doctor.avatar" class="w-28 h-28 rounded-2xl object-cover ring-4 ring-white dark:ring-slate-900 shadow-lg">
+                <div class="w-28 h-28 rounded-2xl overflow-hidden ring-4 ring-white dark:ring-slate-900 shadow-lg">
+                <img v-if="doctor.avatar" :src="doctor.avatar" class="w-full h-full object-cover">
+                <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-3xl">{{ (doctor.firstName||'D')[0] }}{{ (doctor.lastName||'R')[0] }}</div>
+              </div>
                 <div class="mb-1">
                   <div class="flex items-center gap-2">
                     <h2 class="text-xl font-black text-slate-900 dark:text-slate-100">{{ doctor.civility }} {{ doctor.firstName }} {{ doctor.lastName }}</h2>

@@ -10,12 +10,35 @@ const firebaseConfig = {
 
 window.firebaseConfig = firebaseConfig;
 
-// Initialisation automatique directe dans le code
-if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-  try {
-    firebase.initializeApp(firebaseConfig);
-    console.log('Firebase drzone-ad80f initialisé directement dans le code !');
-  } catch (err) {
-    console.warn('Initialisation automatique différée:', err);
+// Helper global pour initialiser Firestore sur la base de données 'default' de drzone-ad80f
+window.getMedidocFirestore = function() {
+  if (typeof firebase === 'undefined') return null;
+  if (!firebase.apps.length) {
+    try {
+      firebase.initializeApp(firebaseConfig);
+    } catch (e) {}
   }
+  try {
+    const db = firebase.firestore();
+    if (db && db._delegate && db._delegate._databaseId) {
+      db._delegate._databaseId.database = 'default';
+    }
+    return db;
+  } catch (err) {
+    console.warn('Erreur init Firestore:', err);
+    return null;
+  }
+};
+
+// Initialisation automatique
+if (typeof firebase !== 'undefined') {
+  if (!firebase.apps.length) {
+    try {
+      firebase.initializeApp(firebaseConfig);
+      console.log('Firebase drzone-ad80f initialisé avec succès !');
+    } catch (err) {
+      console.warn('Initialisation automatique différée:', err);
+    }
+  }
+  window.db = window.getMedidocFirestore();
 }

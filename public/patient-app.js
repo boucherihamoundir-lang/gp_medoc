@@ -118,7 +118,7 @@ const patientApp = createApp({
         relation: '',
         phone: ''
       },
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200'
+      avatar: ''
     });
 
     const patient = ref(createEmptyPatient());
@@ -158,7 +158,7 @@ const patientApp = createApp({
     const doctorReferent = ref(null);
 
     // --- AUTHENTIFICATION PATIENT ---
-    const isAuthenticated = ref(false); // Déconnecté automatiquement à l'ouverture
+    const isAuthenticated = ref(localStorage.getItem('medidoc_patient_auth') === 'true');
     const authMode = ref('signin'); // 'signin', 'signup', 'otp'
     const authMethod = ref('email'); // 'email', 'phone'
     const authPhone = ref('');
@@ -244,13 +244,13 @@ const patientApp = createApp({
           profileEditForm.value.avatar = dataUrl;
           savePatientProfileLocally();
 
-          // Sauvegarder dans Firestore si connecté
+          // Sauvegarder dans Firestore si connecté — /users/{uid}
           if (window.db && patient.value.id) {
-            window.db.collection('patients').doc(patient.value.id).set({
-              avatar: dataUrl,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            const uid = patient.value.id;
+            window.db.collection('users').doc(uid).set({
+              avatar: dataUrl
             }, { merge: true }).then(() => {
-              console.log('Avatar patient synchronisé avec Firestore !');
+              console.log('Avatar patient synchronisé avec /users/ !');
             }).catch(err => {
               console.warn('Erreur synchronisation Firestore avatar:', err);
             });
@@ -396,79 +396,101 @@ const patientApp = createApp({
           if (!firebase.apps.length) {
             firebase.initializeApp(window.firebaseConfig);
           }
-          window.db = firebase.firestore();
+          window.db = (typeof window.getMedidocFirestore === 'function') 
+            ? window.getMedidocFirestore() 
+            : firebase.firestore();
+          if (window.db && window.db._delegate && window.db._delegate._databaseId) {
+            window.db._delegate._databaseId.database = 'default';
+          }
           console.log('Firebase Firestore connecté dans l\'espace patient !');
 
-          // 1. Écouter les médecins créés en temps réel dans Firestore
-          window.db.collection('doctors').onSnapshot(snapshot => {
+          // 1. Écouter les médecins en temps réel depuis /users (role == 'doctor')
+          window.db.collection('users').where('role', '==', 'doctor').onSnapshot(snapshot => {
             const remoteDocs = [];
             snapshot.forEach(docSnap => {
-              if (docSnap.id === 'profile') return; // ignorer le document singleton legacy
               const data = docSnap.data();
-              if (data.role === 'patient') return; // exclure les patients
               remoteDocs.push({
                 id: docSnap.id,
                 name: data.name || `${data.civility || 'Dr.'} ${data.firstName || ''} ${data.lastName || ''}`.trim(),
                 civility: data.civility || 'Dr.',
-                firstName: data.firstName || '',
-                lastName: data.lastName || '',
                 specialty: data.specialty || 'Médecine Générale',
-                cabinetName: data.cabinetName || 'Cabinet Médical',
-                wilaya: data.wilaya || 'Alger',
-                city: data.city || data.wilaya || 'Alger',
-                address: data.address || 'Cabinet Médical',
-                phone: data.phoneOffice || data.phoneEmergency || '+213 21 00 00 00',
+                cabinetName: data.cabinetName || '',
+                wilaya: data.wilaya || '',
+                city: data.city || '',
+                address: data.address || '',
+                phone: data.phone || '',
                 email: data.email || '',
-                avatar: data.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400',
-                teleconsultation: data.teleconsultationEnabled !== false,
-                identityCardNumber: data.identityCardNumber || '',
-                about: data.bio || `Cabinet de consultation médicale du ${data.name || 'Dr.'}`
+                avatar: data.avatar || '',
+                teleconsultation: data.teleconsultation !== false,
+                about: data.bio || ''
               });
             });
-            if (remoteDocs.length > 0) {
-              doctorsCatalog.value = remoteDocs;
-              localStorage.setItem('medidoc_doctors_directory', JSON.stringify(remoteDocs));
-              if (!doctorReferent.value || !doctorReferent.value.id || doctorReferent.value.id === 'doc-default' || !remoteDocs.some(d => d.id === doctorReferent.value.id)) {
-                doctorReferent.value = remoteDocs[0];
-                loadConversation();
-              }
-            } else {
-              doctorsCatalog.value = [];
+            doctorsCatalog.value = remoteDocs;
+            if (remoteDocs.length > 0 && (!doctorReferent.value?.id || !remoteDocs.some(d => d.id === doctorReferent.value.id))) {
+              doctorReferent.value = remoteDocs[0];
+              loadConversation();
+            } else if (remoteDocs.length === 0) {
               doctorReferent.value = null;
             }
           }, err => {
-            console.warn('Lecture Firestore doctors:', err.message);
+            console.warn('Lecture Firestore users (doctors):', err.message);
           });
+
+          // Helper pour synchroniser le profil patient dans /users/{uid}
+          window.syncPatientProfileToFirestore = async (uid) => {
+            if (!window.db || !uid) return;
+            try {
+              await window.db.collection('users').doc(uid).set({
+                uid,
+                name: `${patient.value.firstName || ''} ${patient.value.lastName || ''}`.trim() || (patient.value.email ? patient.value.email.split('@')[0] : 'Patient'),
+                email: patient.value.email || '',
+                avatar: patient.value.avatar || '',
+                role: 'patient',
+                wilaya: patient.value.wilaya || '',
+                phone: patient.value.phone || '',
+                civility: patient.value.civility || '',
+                firstName: patient.value.firstName || '',
+                lastName: patient.value.lastName || '',
+                gender: patient.value.gender || '',
+                birthDate: patient.value.birthDate || '',
+                bloodGroup: patient.value.bloodGroup || 'O+',
+                identityCardNumber: patient.value.identityCardNumber || '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+              console.log('Profil patient synchronisé dans /users/ :', uid);
+            } catch (err) {
+              console.warn('Erreur sync profil patient Firestore:', err);
+            }
+          };
 
           // 2. Gestion de l'état d'authentification Firebase (séparation stricte Patient / Médecin)
           if (firebase.auth) {
             firebase.auth().onAuthStateChanged(async (user) => {
               if (user) {
-                // Vérifier si le compte est un médecin
+                // Vérifier si le compte est un médecin (via /users)
                 try {
-                  const docSnap = await window.db.collection('doctors').doc(user.uid).get();
-                  if (docSnap.exists && (docSnap.data().role === 'doctor' || docSnap.data().specialty)) {
+                  const userSnap = await window.db.collection('users').doc(user.uid).get();
+                  if (userSnap.exists && userSnap.data().role === 'doctor') {
                     await firebase.auth().signOut();
                     isAuthenticated.value = false;
                     localStorage.removeItem('medidoc_patient_auth');
                     notify('Compte Incompatible', 'Ce compte est un compte MÉDECIN. Veuillez vous connecter depuis l\'Espace Praticien.', 'warning');
                     return;
                   }
-                } catch (checkErr) {
-                  console.warn('Vérification rôle:', checkErr);
-                }
-
-                // Charger le profil patient depuis Firestore
-                try {
-                  const patSnap = await window.db.collection('patients').doc(user.uid).get();
-                  if (patSnap.exists) {
-                    patient.value = { ...createEmptyPatient(), ...patSnap.data(), id: user.uid };
+                  // Si role == 'patient', charger le profil
+                  if (userSnap.exists && userSnap.data().role === 'patient') {
+                    patient.value = { ...createEmptyPatient(), ...userSnap.data(), id: user.uid };
                     savePatientProfileLocally();
+                  } else if (!userSnap.exists && window.syncPatientProfileToFirestore) {
+                    patient.value.id = user.uid;
+                    patient.value.email = user.email || patient.value.email;
+                    await window.syncPatientProfileToFirestore(user.uid);
                   } else {
                     patient.value.id = user.uid;
                     patient.value.email = user.email || patient.value.email;
                   }
-                } catch (e) {
+                } catch (checkErr) {
+                  console.warn('Vérification rôle:', checkErr);
                   patient.value.id = user.uid;
                 }
 
@@ -612,7 +634,7 @@ const patientApp = createApp({
               address: doc.address || 'Cabinet Médical',
               phone: doc.phoneOffice || doc.phoneEmergency || '+213 21 66 77 88',
               email: doc.email || '',
-              avatar: doc.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400',
+              avatar: doc.avatar || '',
               teleconsultation: doc.teleconsultationEnabled !== false,
               identityCardNumber: doc.identityCardNumber || '',
               about: doc.bio || `Cabinet de consultation médicale du Dr. ${doc.lastName}`
@@ -766,10 +788,37 @@ const patientApp = createApp({
     // --- MESSAGERIE SOCIALE ENTRE LE PATIENT ET LE MÉDECIN (TEMPS RÉEL) ---
     let convUnsubscribe = null;
 
+    // Helper pour filtrer les faux contacts/conversations de démonstration
+    const isFakeConversation = (c) => {
+      if (!c) return true;
+      const fakeNames = ['sophie martin', 'karim zenati', 'marc benali', 'claire dupont', 'christiane lefebvre', 'alexandre moreau'];
+      const pName = (c.patientName || c.name || '').toLowerCase().trim();
+      if (fakeNames.some(f => pName.includes(f))) return true;
+      if (typeof c.id === 'string' && /^conv-[0-9]+$/.test(c.id)) return true;
+      if (c.patientId === 'pat-1' || c.patientId === 'pat-2' || c.patientId === 'pat-3' || c.patientId === 'pat-4' || c.patientId === 'pat-5') return true;
+      return false;
+    };
+
+    const scrollChatToBottom = () => {
+      setTimeout(() => {
+        const el = document.getElementById('patientChatScrollContainer');
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 60);
+    };
+
+    // Helper to generate consistent unique chatId between any two users
+    const getChatId = (user1Uid, user2Uid) => {
+      if (!user1Uid || !user2Uid) return 'chat_default';
+      return [user1Uid, user2Uid].sort().join('_');
+    };
+
     const getConversationKey = () => {
       const docId = (doctorReferent.value && doctorReferent.value.id) ? doctorReferent.value.id : 'doc_current';
-      const patId = patient.value.id || (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'pat-1');
-      return `conv_${docId}_${patId}`;
+      const patId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+        ? firebase.auth().currentUser.uid
+        : (patient.value.id || 'pat-current');
+      // chatId format: consistent alphabetical [uid1, uid2].sort().join('_')
+      return getChatId(patId, docId);
     };
 
     const loadConversation = () => {
@@ -777,16 +826,19 @@ const patientApp = createApp({
         messages.value = [];
         return;
       }
-      const convKey = getConversationKey();
+      const chatId = getConversationKey();
 
-      // 1. Charger depuis le LocalStorage partagé
+      // 1. Charger depuis le LocalStorage partagé (fallback offline) en purgeant les fake
       const storedConv = localStorage.getItem('medidoc_conversations');
       if (storedConv) {
         try {
           const convs = JSON.parse(storedConv);
-          const found = convs.find(c => c.id === convKey || (c.doctorId === doctorReferent.value.id && c.patientId === patient.value.id));
+          const filtered = Array.isArray(convs) ? convs.filter(c => !isFakeConversation(c)) : [];
+          localStorage.setItem('medidoc_conversations', JSON.stringify(filtered));
+          const found = filtered.find(c => c.id === chatId || (c.doctorId === doctorReferent.value.id && c.patientId === patient.value.id));
           if (found && found.messages) {
             messages.value = found.messages;
+            scrollChatToBottom();
           }
         } catch (e) {}
       }
@@ -797,44 +849,54 @@ const patientApp = createApp({
         convUnsubscribe = null;
       }
 
-      // 2. Écouter en temps réel sur Cloud Firestore si connecté
+      // 2. Écouter en temps réel sur /chats/{chatId}/messages subcollection
       if (window.db) {
-        convUnsubscribe = window.db.collection('conversations').doc(convKey).onSnapshot(docSnap => {
-          if (docSnap && docSnap.exists) {
-            const data = docSnap.data();
-            if (data.messages && Array.isArray(data.messages)) {
-              messages.value = data.messages;
-            }
-          }
-        }, err => {
-          console.warn('Lecture Firestore conversation:', err.message);
-        });
+        const patId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+          ? firebase.auth().currentUser.uid
+          : (patient.value.id || 'pat-current');
+
+        convUnsubscribe = window.db.collection('chats').doc(chatId)
+          .collection('messages').orderBy('timestamp', 'asc')
+          .onSnapshot(msgSnap => {
+            messages.value = msgSnap.docs.map(d => ({
+              id: d.id,
+              sender: (d.data().senderId === patId || d.data().sender === 'patient') ? 'patient' : 'doctor',
+              senderId: d.data().senderId,
+              receiverId: d.data().receiverId,
+              senderName: d.data().senderName,
+              text: d.data().text,
+              attachment: d.data().attachment || null,
+              time: d.data().timestamp?.toDate
+                ? `${String(d.data().timestamp.toDate().getHours()).padStart(2,'0')}:${String(d.data().timestamp.toDate().getMinutes()).padStart(2,'0')}`
+                : new Date().toTimeString().slice(0, 5),
+              timestamp: d.data().timestamp?.toMillis?.() || Date.now()
+            }));
+            scrollChatToBottom();
+          }, err => console.warn('Lecture messages chat:', err.message));
       }
     };
 
     const saveConversation = async (newMsg) => {
       if (!doctorReferent.value || !doctorReferent.value.id) return;
-      const convKey = getConversationKey();
+      const chatId = getConversationKey();
       const patId = patient.value.id || (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'pat-1');
+      const docId = doctorReferent.value.id;
       const patientFullName = `${patient.value.firstName || ''} ${patient.value.lastName || ''}`.trim() || 'Patient MEDOC';
 
-      // 1. Sauvegarde locale partagée
+      // 1. Sauvegarde locale partagée (fallback offline)
       try {
         let convs = [];
         const stored = localStorage.getItem('medidoc_conversations');
         if (stored) convs = JSON.parse(stored);
 
-        let targetConv = convs.find(c => c.id === convKey);
+        let targetConv = convs.find(c => c.id === chatId);
         if (!targetConv) {
           targetConv = {
-            id: convKey,
-            doctorId: doctorReferent.value.id,
+            id: chatId,
+            doctorId: docId,
             doctorName: doctorReferent.value.name,
             patientId: patId,
             patientName: patientFullName,
-            avatar: patient.value.avatar,
-            unreadCount: 1,
-            onlineStatus: 'online',
             messages: []
           };
           convs.unshift(targetConv);
@@ -842,27 +904,31 @@ const patientApp = createApp({
         targetConv.messages = messages.value;
         targetConv.lastMessage = newMsg.text;
         targetConv.lastTime = newMsg.time;
-        targetConv.unreadCount = (targetConv.unreadCount || 0) + 1;
         localStorage.setItem('medidoc_conversations', JSON.stringify(convs));
       } catch (e) {}
 
-      // 2. Sauvegarde Cloud Firestore
+      // 2. Sauvegarde Cloud Firestore — /chats/{chatId} + /messages subcollection
       if (window.db) {
         try {
-          await window.db.collection('conversations').doc(convKey).set({
-            id: convKey,
-            doctorId: doctorReferent.value.id,
-            doctorName: doctorReferent.value.name,
+          // Mettre à jour le document chat parent
+          await window.db.collection('chats').doc(chatId).set({
+            participants: [patId, docId],
             patientId: patId,
+            doctorId: docId,
             patientName: patientFullName,
-            avatar: patient.value.avatar || '',
+            doctorName: doctorReferent.value.name,
             lastMessage: newMsg.text,
-            lastTime: newMsg.time,
-            unreadCount: firebase.firestore.FieldValue.increment(1),
-            onlineStatus: 'online',
-            messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // Ajouter le message dans la sous-collection
+          await window.db.collection('chats').doc(chatId).collection('messages').add({
+            senderId: patId,
+            receiverId: docId,
+            senderName: patientFullName,
+            text: newMsg.text,
+            attachment: newMsg.attachment || null,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
         } catch (err) {
           console.warn('Erreur sync message Firestore:', err);
         }
@@ -878,7 +944,9 @@ const patientApp = createApp({
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const patId = patient.value.id || (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'pat-1');
+      const patId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+        ? firebase.auth().currentUser.uid
+        : (patient.value.id || 'pat-current');
       const senderName = patient.value.firstName ? `${patient.value.firstName} ${patient.value.lastName}` : 'Patient';
 
       const newMsg = {
@@ -894,11 +962,19 @@ const patientApp = createApp({
       };
 
       messages.value.push(newMsg);
+      scrollChatToBottom();
       newMessageText.value = '';
       selectedAttachmentForChat.value = null;
 
       await saveConversation(newMsg);
     };
+
+    watch(activeTab, (tab) => {
+      if (tab === 'chat') {
+        loadConversation();
+        scrollChatToBottom();
+      }
+    });
 
     const sendQuickPatientMessage = (txt) => {
       newMessageText.value = txt;
@@ -1148,13 +1224,19 @@ const patientApp = createApp({
           const userCred = await firebase.auth().signInWithEmailAndPassword(authEmail.value.trim(), authPassword.value);
           uid = userCred.user.uid;
 
-          // Vérification stricte du rôle : refuser si c'est un compte médecin
+          // Vérification stricte du rôle : refuser si c'est un compte médecin (via /users)
           if (window.db) {
             try {
-              const docSnap = await window.db.collection('doctors').doc(uid).get();
-              if (docSnap.exists && (docSnap.data().role === 'doctor' || docSnap.data().specialty)) {
+              const userSnap = await window.db.collection('users').doc(uid).get();
+              if (userSnap.exists && userSnap.data().role === 'doctor') {
                 await firebase.auth().signOut();
                 throw new Error("Ce compte est un compte MÉDECIN. Veuillez vous connecter depuis l'Espace Praticien.");
+              }
+              // Si role == 'patient', charger le profil depuis /users
+              if (userSnap.exists && userSnap.data().role === 'patient') {
+                patient.value = { ...createEmptyPatient(), ...userSnap.data(), id: uid };
+              } else if (!userSnap.exists && window.syncPatientProfileToFirestore) {
+                await window.syncPatientProfileToFirestore(uid);
               }
             } catch (checkErr) {
               if (checkErr.message.includes('MÉDECIN')) throw checkErr;
@@ -1162,14 +1244,6 @@ const patientApp = createApp({
           }
 
           patient.value.id = uid;
-
-          // Récupérer le profil depuis Firestore
-          if (window.db) {
-            const docSnap = await window.db.collection('patients').doc(uid).get();
-            if (docSnap.exists) {
-              patient.value = { ...createEmptyPatient(), ...docSnap.data(), id: uid };
-            }
-          }
         }
         isAuthenticated.value = true;
         patient.value.email = authEmail.value;
@@ -1186,6 +1260,8 @@ const patientApp = createApp({
           errorMsg = 'Adresse email invalide.';
         } else if (err.code === 'auth/too-many-requests') {
           errorMsg = 'Trop de tentatives infructueuses. Veuillez patienter.';
+        } else if (err.code === 'auth/firebase-app-check-token-is-invalid' || (err.message && err.message.includes('app-check-token-is-invalid'))) {
+          errorMsg = "App Check bloque la connexion : Dans Firebase Console > App Check > Services/Produits, désactivez l'application (Unenforce) sur 'Authentication'.";
         }
         notify('Erreur de connexion', errorMsg, 'error');
       } finally {
@@ -1238,19 +1314,27 @@ const patientApp = createApp({
         savePatientProfileLocally();
         saveDocumentsLocally();
 
-        // Enregistrer l'utilisateur dans Cloud Firestore
+        // Enregistrer l'utilisateur dans Cloud Firestore — /users/{uid} seulement
         if (window.db) {
           try {
-            await window.db.collection('patients').doc(uid).set({
-              ...patient.value,
-              id: uid,
-              uid: uid,
-              patientId: uid,
+            await window.db.collection('users').doc(uid).set({
+              uid,
               name: `${patient.value.firstName} ${patient.value.lastName}`.trim(),
+              email: patient.value.email,
+              avatar: '',
               role: 'patient',
+              wilaya: patient.value.wilaya || '',
+              phone: patient.value.phone || '',
+              civility: patient.value.civility || '',
+              firstName: patient.value.firstName,
+              lastName: patient.value.lastName,
+              gender: patient.value.gender || '',
+              birthDate: patient.value.birthDate || '',
+              bloodGroup: patient.value.bloodGroup || 'O+',
+              identityCardNumber: patient.value.identityCardNumber || '',
               createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            console.log('Patient créé avec succès dans Firestore !');
+            console.log('Patient créé avec succès dans /users/ !');
           } catch (err) {
             console.warn('Erreur Firestore patient set:', err);
           }
@@ -1269,12 +1353,15 @@ const patientApp = createApp({
           errorMsg = 'Adresse email invalide.';
         } else if (err.code === 'auth/weak-password') {
           errorMsg = 'Mot de passe trop court (6 caractères minimum).';
+        } else if (err.code === 'auth/operation-not-allowed') {
+          errorMsg = "Activez 'Adresse e-mail/Mot de passe' dans Firebase Console > Authentication > Sign-in method.";
+        } else if (err.code === 'auth/firebase-app-check-token-is-invalid' || (err.message && err.message.includes('app-check-token-is-invalid'))) {
+          errorMsg = "App Check bloque l'inscription : Dans Firebase Console > App Check > Services/Produits, désactivez l'application (Unenforce) sur 'Authentication'.";
         }
         notify('Erreur d\'inscription', errorMsg, 'error');
       } finally {
         authLoading.value = false;
       }
-    };
     };
 
     const sendPatientOtp = async () => {

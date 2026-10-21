@@ -13,7 +13,7 @@ const app = createApp({
     const doctor = ref({ ...defaultDoctorProfile });
 
     // --- AUTHENTIFICATION SMS (SIGN IN / SIGN UP) ---
-    const isAuthenticated = ref(false); // Déconnecté automatiquement à l'ouverture
+    const isAuthenticated = ref(localStorage.getItem('medidoc_auth') === 'true');
     const authMode = ref('signin'); // 'signin', 'signup', 'otp'
     const authCountryCode = ref('+213');
     const authPhoneNumber = ref('');
@@ -197,6 +197,24 @@ const app = createApp({
       }, 4000);
     };
 
+    // Helper pour filtrer les faux contacts/conversations de démonstration
+    const isFakeConversation = (c) => {
+      if (!c) return true;
+      const fakeNames = ['sophie martin', 'karim zenati', 'marc benali', 'claire dupont', 'christiane lefebvre', 'alexandre moreau'];
+      const pName = (c.patientName || '').toLowerCase().trim();
+      if (fakeNames.some(f => pName.includes(f))) return true;
+      if (typeof c.id === 'string' && /^conv-[0-9]+$/.test(c.id)) return true;
+      if (c.patientId === 'pat-1' || c.patientId === 'pat-2' || c.patientId === 'pat-3' || c.patientId === 'pat-4' || c.patientId === 'pat-5') return true;
+      return false;
+    };
+
+    const scrollChatToBottom = () => {
+      setTimeout(() => {
+        const el = document.getElementById('doctorChatScrollContainer');
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 60);
+    };
+
     // --- CHARGEMENT INITIAL ---
     onMounted(async () => {
       try {
@@ -211,7 +229,16 @@ const app = createApp({
         if (savedAppointments) appointments.value = JSON.parse(savedAppointments);
 
         const savedConversations = localStorage.getItem('medidoc_conversations');
-        if (savedConversations) conversations.value = JSON.parse(savedConversations);
+        if (savedConversations) {
+          try {
+            const parsed = JSON.parse(savedConversations);
+            const filtered = Array.isArray(parsed) ? parsed.filter(c => !isFakeConversation(c)) : [];
+            conversations.value = filtered;
+            localStorage.setItem('medidoc_conversations', JSON.stringify(filtered));
+          } catch (e) {
+            conversations.value = [];
+          }
+        }
 
         // Connexion automatique à Firebase avec la config intégrée dans le code
         await connectToFirebase(false);
@@ -324,6 +351,12 @@ const app = createApp({
           doctor.value.avatar = dataUrl;
           saveDoctorDataLocally();
           if (firebaseConnected.value && window.db) {
+            // Mettre à jour l'avatar dans /users/{uid}
+            const uid = firebase.auth().currentUser?.uid || doctor.value.id;
+            if (uid) {
+              window.db.collection('users').doc(uid).set({ avatar: dataUrl }, { merge: true })
+                .catch(err => console.warn('Erreur mise à jour avatar Firestore:', err));
+            }
             syncProfileToFirebase();
           }
           notify('Photo de profil mise à jour !', 'Votre photo a été enregistrée avec succès dans Firebase.', 'success');
@@ -443,6 +476,7 @@ const app = createApp({
 
     // --- MESSAGERIE / CHAT ---
     const activeConversation = computed(() => {
+      if (!conversations.value || conversations.value.length === 0) return null;
       return conversations.value.find(c => c.id === activeConversationId.value) || conversations.value[0];
     });
 
@@ -458,11 +492,20 @@ const app = createApp({
     const selectConversation = (convId) => {
       activeConversationId.value = convId;
       const conv = conversations.value.find(c => c.id === convId);
-      if (conv && conv.unreadCount > 0) {
-        conv.unreadCount = 0;
-        conv.messages.forEach(m => m.status = 'read');
-        saveDoctorDataLocally();
+      if (conv) {
+        if (conv.unreadCount > 0) {
+          conv.unreadCount = 0;
+          if (conv.messages) conv.messages.forEach(m => m.status = 'read');
+          saveDoctorDataLocally();
+        }
       }
+      scrollChatToBottom();
+    };
+
+    // Helper to generate consistent unique chatId between any two users
+    const getChatId = (user1Uid, user2Uid) => {
+      if (!user1Uid || !user2Uid) return 'chat_default';
+      return [user1Uid, user2Uid].sort().join('_');
     };
 
     const sendMessage = async () => {
@@ -475,17 +518,24 @@ const app = createApp({
         : (doctor.value.id || 'doc_current');
       const docSenderName = `${doctor.value.civility || 'Dr.'} ${doctor.value.firstName || ''} ${doctor.value.lastName || ''}`.trim() || 'Docteur';
 
-      // Identifiant unifié et déterministe de la conversation : conv_{doctorId}_{patientId}
-      const patId = activeConversation.value.patientId || 'pat-1';
-      const convId = `conv_${docSenderId}_${patId}`;
-      activeConversation.value.id = convId;
+      const patId = activeConversation.value.patientId;
+      if (!patId) {
+        notify('Destinataire requis', 'Impossible de déterminer l\'identifiant du patient.', 'warning');
+        return;
+      }
+      const chatId = getChatId(docSenderId, patId);
+      activeConversation.value.id = chatId;
+
+      const textToSend = newMessageText.value.trim();
+      newMessageText.value = '';
 
       const newMsg = {
         id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         sender: 'doctor',
         senderId: docSenderId,
+        receiverId: patId,
         senderName: docSenderName,
-        text: newMessageText.value.trim(),
+        text: textToSend,
         time: timeStr,
         timestamp: Date.now(),
         status: 'sent'
@@ -493,31 +543,36 @@ const app = createApp({
 
       if (!activeConversation.value.messages) activeConversation.value.messages = [];
       activeConversation.value.messages.push(newMsg);
-      activeConversation.value.lastMessage = newMsg.text;
+      activeConversation.value.lastMessage = textToSend;
       activeConversation.value.lastTime = timeStr;
       activeConversation.value.doctorId = docSenderId;
       activeConversation.value.doctorName = docSenderName;
-      newMessageText.value = '';
 
+      scrollChatToBottom();
       saveDoctorDataLocally();
 
-      // Synchroniser avec Firestore en temps réel
+      // Synchroniser avec Firestore (nouveau schéma /chats + /messages subcollection)
       if (window.db) {
         try {
-          await window.db.collection('conversations').doc(convId).set({
-            id: convId,
+          // Mettre à jour le document chat parent
+          await window.db.collection('chats').doc(chatId).set({
+            participants: [patId, docSenderId],
             patientId: patId,
-            patientName: activeConversation.value.patientName || 'Patient',
             doctorId: docSenderId,
+            patientName: activeConversation.value.patientName || 'Patient',
             doctorName: docSenderName,
-            avatar: activeConversation.value.avatar || '',
-            lastMessage: newMsg.text,
-            lastTime: timeStr,
-            unreadCount: firebase.firestore.FieldValue.increment(1),
-            onlineStatus: 'online',
-            messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            lastMessage: textToSend,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // Ajouter le message dans la sous-collection
+          await window.db.collection('chats').doc(chatId).collection('messages').add({
+            senderId: docSenderId,
+            receiverId: patId,
+            senderName: docSenderName,
+            text: textToSend,
+            attachment: null,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
         } catch (err) {
           console.warn('Erreur envoi message docteur Firestore:', err);
         }
@@ -556,8 +611,8 @@ const app = createApp({
       }
 
       const patId = activeConversation.value.patientId || 'pat-1';
-      const convId = `conv_${docSenderId}_${patId}`;
-      activeConversation.value.id = convId;
+      const chatId = getChatId(docSenderId, patId);
+      activeConversation.value.id = chatId;
 
       const newMsg = {
         id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -582,20 +637,25 @@ const app = createApp({
 
       if (window.db) {
         try {
-          await window.db.collection('conversations').doc(convId).set({
-            id: convId,
+          // Mettre à jour le document chat parent
+          await window.db.collection('chats').doc(chatId).set({
+            participants: [patId, docSenderId],
             patientId: patId,
-            patientName: activeConversation.value.patientName || 'Patient',
             doctorId: docSenderId,
+            patientName: activeConversation.value.patientName || 'Patient',
             doctorName: docSenderName,
-            avatar: activeConversation.value.avatar || '',
             lastMessage: activeConversation.value.lastMessage,
-            lastTime: activeConversation.value.lastTime,
-            unreadCount: firebase.firestore.FieldValue.increment(1),
-            onlineStatus: 'online',
-            messages: firebase.firestore.FieldValue.arrayUnion(newMsg),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          // Ajouter le message (avec pièce jointe) dans la sous-collection
+          await window.db.collection('chats').doc(chatId).collection('messages').add({
+            senderId: docSenderId,
+            receiverId: patId,
+            senderName: docSenderName,
+            text: newMsg.text,
+            attachment: attachmentInfo,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
         } catch (err) {
           console.warn('Erreur envoi pièce jointe Firestore:', err);
         }
@@ -604,6 +664,10 @@ const app = createApp({
       notify('Document transmis', `${attachmentInfo.title} envoyé à ${activeConversation.value.patientName}`, 'success');
     };
 
+    // Store unsubscribe functions for chat listeners
+    let chatsUnsubscribe = null;
+    const msgUnsubscribes = {}; // { chatId: unsubscribeFn }
+
     const listenToConversationsInFirestore = () => {
       if (!window.db) return;
       try {
@@ -611,60 +675,95 @@ const app = createApp({
           ? firebase.auth().currentUser.uid
           : (doctor.value.id || null);
 
-        let query = window.db.collection('conversations');
-        if (docId) {
-          query = query.where('doctorId', '==', docId);
-        }
+        if (!docId) return;
 
-        query.onSnapshot((snapshot) => {
+        // Clean up previous chat listener
+        if (chatsUnsubscribe) { chatsUnsubscribe(); chatsUnsubscribe = null; }
+
+        const query = window.db.collection('chats').where('participants', 'array-contains', docId);
+
+        chatsUnsubscribe = query.onSnapshot((snapshot) => {
           if (!snapshot) return;
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const convId = docSnap.id;
-            let existing = conversations.value.find(c => c.id === convId || (c.patientId === data.patientId && c.doctorId === data.doctorId));
-            if (existing) {
-              existing.id = convId;
-              if (data.messages && Array.isArray(data.messages)) {
-                existing.messages = data.messages;
-              }
-              existing.lastMessage = data.lastMessage || existing.lastMessage;
-              existing.lastTime = data.lastTime || existing.lastTime;
-              existing.unreadCount = data.unreadCount || 0;
+          snapshot.forEach((chatSnap) => {
+            const data = chatSnap.data();
+            const chatId = chatSnap.id;
 
-              // Mettre à jour la conversation active en temps réel
-              if (activeConversation.value && (activeConversation.value.id === convId || activeConversation.value.patientId === data.patientId)) {
-                activeConversation.value.messages = data.messages || [];
-                activeConversation.value.lastMessage = data.lastMessage;
-                activeConversation.value.lastTime = data.lastTime;
-              }
+            // Update or insert conversation entry
+            let existing = conversations.value.find(c => c.id === chatId);
+            if (existing) {
+              existing.lastMessage = data.lastMessage || existing.lastMessage;
+              existing.lastTime = data.lastUpdated
+                ? (data.lastUpdated.toDate ? new Date(data.lastUpdated.toDate()).toTimeString().slice(0, 5) : existing.lastTime)
+                : existing.lastTime;
+              existing.patientName = data.patientName || existing.patientName;
+              existing.doctorName = data.doctorName || existing.doctorName;
             } else {
               const newConv = {
-                id: convId,
-                patientId: data.patientId || 'pat-patient',
+                id: chatId,
+                patientId: data.patientId || '',
                 doctorId: data.doctorId || docId,
                 doctorName: data.doctorName || `${doctor.value.civility || 'Dr.'} ${doctor.value.lastName || ''}`,
                 patientName: data.patientName || 'Patient',
-                avatar: data.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
-                unreadCount: 1,
+                avatar: data.patientAvatar || '',
+                unreadCount: 0,
                 onlineStatus: 'online',
                 lastMessage: data.lastMessage || 'Nouvelle conversation initiée',
-                lastTime: data.lastTime || 'À l\'instant',
-                category: data.category || 'suivi',
-                messages: data.messages || []
+                lastTime: 'À l\'instant',
+                category: 'suivi',
+                messages: []
               };
               conversations.value.unshift(newConv);
-              if (!activeConversationId.value) {
-                activeConversationId.value = convId;
+              if (!activeConversationId.value || !conversations.value.some(c => c.id === activeConversationId.value)) {
+                activeConversationId.value = chatId;
               }
               notify('Nouveau message patient', `${data.patientName || 'Un patient'} vous a envoyé un message.`, 'info');
             }
+
+            // Subscribe to this chat's messages subcollection if not already
+            if (!msgUnsubscribes[chatId]) {
+              msgUnsubscribes[chatId] = window.db.collection('chats').doc(chatId)
+                .collection('messages').orderBy('timestamp', 'asc')
+                .onSnapshot(msgSnap => {
+                  const conv = conversations.value.find(c => c.id === chatId);
+                  if (!conv) return;
+                  conv.messages = msgSnap.docs.map(d => {
+                    const m = d.data();
+                    return {
+                      id: d.id,
+                      sender: (m.senderId === docId || m.sender === 'doctor') ? 'doctor' : 'patient',
+                      senderId: m.senderId,
+                      receiverId: m.receiverId,
+                      senderName: m.senderName,
+                      text: m.text,
+                      attachment: m.attachment || null,
+                      time: m.timestamp?.toDate
+                        ? `${String(m.timestamp.toDate().getHours()).padStart(2,'0')}:${String(m.timestamp.toDate().getMinutes()).padStart(2,'0')}`
+                        : new Date().toTimeString().slice(0, 5),
+                      timestamp: m.timestamp?.toMillis?.() || Date.now(),
+                      status: 'sent'
+                    };
+                  });
+                  if (conv.messages.length > 0) {
+                    conv.lastMessage = conv.messages[conv.messages.length - 1].text;
+                    conv.lastTime = conv.messages[conv.messages.length - 1].time;
+                  }
+                  if (activeConversationId.value === chatId) {
+                    scrollChatToBottom();
+                  }
+                  conversations.value = conversations.value.filter(c => !isFakeConversation(c));
+                  localStorage.setItem('medidoc_conversations', JSON.stringify(conversations.value));
+                }, err => {
+                  console.warn('Erreur messages subcollection:', err.message);
+                });
+            }
           });
+          conversations.value = conversations.value.filter(c => !isFakeConversation(c));
           localStorage.setItem('medidoc_conversations', JSON.stringify(conversations.value));
         }, (err) => {
-          console.warn('Avis listener Firestore:', err);
+          console.warn('Avis listener Firestore chats:', err);
         });
       } catch (err) {
-        console.warn('Erreur listener Firestore conversations:', err);
+        console.warn('Erreur listener Firestore chats:', err);
       }
     };
 
@@ -672,7 +771,8 @@ const app = createApp({
       const docSenderId = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
         ? firebase.auth().currentUser.uid
         : (doctor.value.id || 'doc_current');
-      const expectedConvId = `conv_${docSenderId}_${patientId}`;
+      // chatId format: consistent alphabetical [uid1, uid2].sort().join('_')
+      const expectedConvId = getChatId(docSenderId, patientId);
 
       let conv = conversations.value.find(c => c.id === expectedConvId || c.patientId === patientId);
       if (!conv) {
@@ -683,7 +783,7 @@ const app = createApp({
           doctorId: docSenderId,
           doctorName: `${doctor.value.civility || 'Dr.'} ${doctor.value.lastName || ''}`.trim() || 'Docteur',
           patientName: patient ? patient.name : 'Patient',
-          avatar: patient ? patient.avatar : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+          avatar: patient ? (patient.avatar || '') : '',
           unreadCount: 0,
           onlineStatus: 'online',
           lastMessage: 'Discussion ouverte',
@@ -737,7 +837,12 @@ const app = createApp({
           }
 
           firebase.initializeApp(FIREBASE_CONFIG);
-          window.db = firebase.firestore();
+          window.db = (typeof window.getMedidocFirestore === 'function') 
+            ? window.getMedidocFirestore() 
+            : firebase.firestore();
+          if (window.db && window.db._delegate && window.db._delegate._databaseId) {
+            window.db._delegate._databaseId.database = 'default';
+          }
           window.auth = firebase.auth();
 
           firebaseConnected.value = true;
@@ -755,21 +860,25 @@ const app = createApp({
           if (firebase.auth) {
             firebase.auth().onAuthStateChanged(async (user) => {
               if (user) {
-                // Vérifier si le compte connecté est un patient
+                // Vérifier si le compte connecté est un patient (via /users)
                 if (window.db) {
                   try {
-                    const patSnap = await window.db.collection('patients').doc(user.uid).get();
-                    if (patSnap.exists && patSnap.data().role === 'patient') {
+                    const userSnap = await window.db.collection('users').doc(user.uid).get();
+                    if (userSnap.exists && userSnap.data().role === 'patient') {
                       await firebase.auth().signOut();
                       isAuthenticated.value = false;
                       localStorage.removeItem('medidoc_auth');
+                      notify('Compte incompatible', 'Ce compte est un compte PATIENT. Connectez-vous depuis l\'Espace Patient.', 'error');
                       return;
                     }
                   } catch (e) {}
                 }
                 doctor.value.id = user.uid;
                 if (user.email && !doctor.value.email) doctor.value.email = user.email;
+                isAuthenticated.value = true;
+                localStorage.setItem('medidoc_auth', 'true');
                 saveDoctorDataLocally();
+                await syncProfileToFirebase();
                 loadDataFromFirebase();
                 listenToConversationsInFirestore();
                 listenToPatientsInFirestore();
@@ -799,52 +908,31 @@ const app = createApp({
     const syncProfileToFirebase = async () => {
       if (!window.db) return;
       try {
-        const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
-        const uid = currentUser ? currentUser.uid : ('doc_' + (doctor.value.rpps || Date.now()));
+        const uid = firebase.auth().currentUser?.uid || doctor.value.id;
+        if (!uid) return;
 
-        // Sauvegarder le profil du médecin avec son UID pour que les patients puissent le trouver
-        const doctorData = {
-          ...doctor.value,
-          id: uid,
-          role: 'doctor',
-          name: `${doctor.value.firstName || ''} ${doctor.value.lastName || ''}`.trim(),
-          teleconsultation: doctor.value.teleconsultationEnabled || false,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        // Chemin principal du médecin (par UID)
-        await window.db.collection('doctors').doc(uid).set(doctorData, { merge: true });
-        // Chemin secondaire legacy
-        await window.db.collection('doctors').doc('profile').set(doctorData, { merge: true });
-
-        // Répertoire public des médecins (utilisé par la recherche patient)
-        const directoryEntry = {
-          id: uid,
-          name: `${doctor.value.firstName || ''} ${doctor.value.lastName || ''}`.trim(),
-          civility: doctor.value.civility || 'Dr.',
-          specialty: doctor.value.specialty || 'Médecine Générale',
-          cabinetName: doctor.value.cabinetName || 'Cabinet Médical',
-          wilaya: doctor.value.wilaya || '',
-          city: doctor.value.city || '',
-          address: doctor.value.address || '',
-          phone: doctor.value.phoneOffice || '',
+        // Écrire dans /users/{uid} (nouveau schéma)
+        await window.db.collection('users').doc(uid).set({
+          uid,
+          name: `${doctor.value.civility || 'Dr.'} ${doctor.value.firstName || ''} ${doctor.value.lastName || ''}`.trim(),
+          email: doctor.value.email || '',
           avatar: doctor.value.avatar || '',
+          role: 'doctor',
+          specialty: doctor.value.specialty || 'Médecine Générale',
+          cabinetName: doctor.value.cabinetName || '',
+          wilaya: doctor.value.wilaya || '',
+          phone: doctor.value.phoneOffice || '',
+          civility: doctor.value.civility || 'Dr.',
+          firstName: doctor.value.firstName || '',
+          lastName: doctor.value.lastName || '',
           teleconsultation: doctor.value.teleconsultationEnabled || false,
-          rating: 4.8,
-          reviewCount: 27,
-          nextSlot: 'Sur RDV',
+          address: doctor.value.address || '',
+          city: doctor.value.city || '',
+          bio: doctor.value.bio || '',
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        await window.db.collection('medidoc_doctors_directory').doc(uid).set(directoryEntry, { merge: true });
+        }, { merge: true });
 
-        // Synchroniser dans localStorage pour cross-tab
-        const localDir = JSON.parse(localStorage.getItem('medidoc_doctors_directory') || '[]');
-        const idx = localDir.findIndex(d => d.id === uid);
-        if (idx >= 0) localDir[idx] = directoryEntry;
-        else localDir.push(directoryEntry);
-        localStorage.setItem('medidoc_doctors_directory', JSON.stringify(localDir));
-
-        console.log('Profil médecin synchronisé avec Firestore :', uid);
+        console.log('Profil médecin synchronisé avec /users/ :', uid);
       } catch (err) {
         console.error('Erreur sync profil Firestore:', err);
       }
@@ -854,15 +942,12 @@ const app = createApp({
       if (!window.db) return;
       try {
         const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
-        let docRef;
-        if (currentUser) {
-          docRef = await window.db.collection('doctors').doc(currentUser.uid).get();
-        }
-        if (!docRef || !docRef.exists) {
-          docRef = await window.db.collection('doctors').doc('profile').get();
-        }
-        if (docRef && docRef.exists) {
-          doctor.value = { ...doctor.value, ...docRef.data() };
+        if (!currentUser) return;
+        // Lire depuis /users/{uid} (nouveau schéma)
+        const docRef = await window.db.collection('users').doc(currentUser.uid).get();
+        if (docRef.exists) {
+          const d = docRef.data();
+          doctor.value = { ...doctor.value, ...d, id: currentUser.uid };
           if (doctor.value.theme) theme.value = doctor.value.theme;
           if (doctor.value.darkMode !== undefined) darkMode.value = doctor.value.darkMode;
         }
@@ -874,7 +959,7 @@ const app = createApp({
     const listenToPatientsInFirestore = () => {
       if (!window.db) return;
       try {
-        window.db.collection('patients').onSnapshot((snapshot) => {
+        window.db.collection('users').where('role', '==', 'patient').onSnapshot((snapshot) => {
           if (!snapshot) return;
           const list = [];
           snapshot.forEach(docSnap => {
@@ -893,7 +978,7 @@ const app = createApp({
               email: d.email || '',
               wilaya: d.wilaya || '',
               city: d.city || '',
-              avatar: d.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+              avatar: d.avatar || '',
               chronicConditions: d.chronicConditions || [],
               allergies: d.allergies || []
             });
@@ -1131,10 +1216,21 @@ const app = createApp({
           const userCred = await firebase.auth().createUserWithEmailAndPassword(email, pwd);
           if (userCred.user) {
             doctor.value.id = userCred.user.uid;
+            const fullName = `${authSignupForm.value.civility || 'Dr.'} ${authSignupForm.value.firstName} ${authSignupForm.value.lastName}`.trim();
             if (userCred.user.updateProfile) {
               await userCred.user.updateProfile({
-                displayName: `${authSignupForm.value.civility} ${authSignupForm.value.firstName} ${authSignupForm.value.lastName}`
+                displayName: fullName
               });
+            }
+            // Save user profile directly into Firestore under their UID with designated role
+            if (window.db) {
+              await window.db.collection('users').doc(userCred.user.uid).set({
+                uid: userCred.user.uid,
+                name: fullName,
+                email: email,
+                role: 'doctor',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
             }
           }
         }
@@ -1158,7 +1254,7 @@ const app = createApp({
 
         saveDoctorDataLocally();
         if (firebaseConnected.value && window.db) {
-          await syncProfileToFirebase();
+          await syncProfileToFirebase(); // syncProfileToFirebase now writes to /users/{uid}
           listenToConversationsInFirestore();
         }
 
@@ -1176,6 +1272,8 @@ const app = createApp({
           errorMsg = 'Mot de passe trop court (6 caractères minimum).';
         } else if (err.code === 'auth/operation-not-allowed') {
           errorMsg = "Activez 'Adresse e-mail/Mot de passe' dans Firebase Console > Authentication > Sign-in method.";
+        } else if (err.code === 'auth/firebase-app-check-token-is-invalid' || (err.message && err.message.includes('app-check-token-is-invalid'))) {
+          errorMsg = "App Check bloque l'inscription : Dans Firebase Console > App Check > Services/Produits, désactivez l'application (Unenforce) sur 'Authentication'.";
         }
         notify('Erreur Inscription Email', errorMsg, 'error');
       } finally {
@@ -1202,11 +1300,11 @@ const app = createApp({
           const userCred = await firebase.auth().signInWithEmailAndPassword(email, pwd);
           if (userCred.user) {
             const uid = userCred.user.uid;
-            // Vérification stricte du rôle : refuser si c'est un compte patient
+            // Vérification stricte du rôle : refuser si c'est un compte patient (via /users)
             if (window.db) {
               try {
-                const patSnap = await window.db.collection('patients').doc(uid).get();
-                if (patSnap.exists && patSnap.data().role === 'patient') {
+                const userSnap = await window.db.collection('users').doc(uid).get();
+                if (userSnap.exists && userSnap.data().role === 'patient') {
                   await firebase.auth().signOut();
                   throw new Error("Ce compte est un compte PATIENT. Veuillez vous connecter depuis l'Espace Patient.");
                 }
@@ -1224,6 +1322,7 @@ const app = createApp({
         saveDoctorDataLocally();
 
         if (firebaseConnected.value && window.db) {
+          await syncProfileToFirebase();
           await loadDataFromFirebase();
           listenToConversationsInFirestore();
           listenToPatientsInFirestore();
@@ -1242,6 +1341,8 @@ const app = createApp({
           errorMsg = 'Trop de tentatives infructueuses. Veuillez patienter.';
         } else if (err.code === 'auth/operation-not-allowed') {
           errorMsg = "Activez 'Adresse e-mail/Mot de passe' dans Firebase Console > Authentication > Sign-in method.";
+        } else if (err.code === 'auth/firebase-app-check-token-is-invalid' || (err.message && err.message.includes('app-check-token-is-invalid'))) {
+          errorMsg = "App Check bloque la connexion : Dans Firebase Console > App Check > Services/Produits, désactivez l'application (Unenforce) sur 'Authentication'.";
         }
         notify('Erreur Connexion Email', errorMsg, 'error');
       } finally {

@@ -10,7 +10,7 @@ const defaultDoctorProfile = {
   rpps: "",
   adeli: "",
   bio: "",
-  avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400",
+  avatar: "",
   status: "available", // available, in_consultation, away
   statusMessage: "Disponible au cabinet",
 
@@ -85,15 +85,6 @@ const quickReplies = [
   "Veuillez prendre un rendez-vous en présentiel au cabinet pour un examen clinique approfondi.",
   "La posologie recommandée est de 1 comprimé le matin au cours du petit-déjeuner.",
   "Je vous joins le compte-rendu médical dans votre espace sécurisé."
-];
-
-// Presets d'avatars de médecin pour la personnalisation
-const doctorAvatarPresets = [
-  { label: "Homme - Praticien Moderne", url: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400" },
-  { label: "Femme - Praticienne Souriante", url: "https://images.unsplash.com/photo-1594824813639-4402636ebbf9?auto=format&fit=crop&q=80&w=400" },
-  { label: "Homme - Cardiologue / Senior", url: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=400" },
-  { label: "Femme - Pédiatre / Spécialiste", url: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400" },
-  { label: "Homme - Jeune Médecin", url: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400" }
 ];
 
 // Documents médicaux du patient (vide par défaut)

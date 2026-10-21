@@ -138,3 +138,30 @@ body {
   }
 }
 
+/* ========================================================================= */
+/* RÉSOLUTION MOBILE & TÉLÉPHONE (SMARTPHONE / PETITS ÉCRANS)                 */
+/* ========================================================================= */
+@media (max-width: 768px) {
+  /* Bulles de discussion adaptées à la largeur des smartphones */
+  .chat-bubble-doctor, 
+  .chat-bubble-patient {
+    max-width: 88% !important;
+    word-break: break-word !important;
+  }
+
+  /* Défilement fluide et tactile pour l'historique de chat */
+  #doctorChatScrollContainer, 
+  #patientChatScrollContainer {
+    padding: 10px 8px !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Optimisation de la hauteur de conversation sur téléphone */
+  .conversation-container-mobile {
+    height: calc(100dvh - 130px) !important;
+    min-height: 480px !important;
+  }
+}
+
+
