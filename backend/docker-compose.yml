@@ -1,0 +1,176 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. Base de Données Partagée avec 6 Bases Dédiées
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: medoc_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medoc_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medoc_secure_password_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 2. Redis Message Broker & WebSockets Layer
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: medoc_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 3. Microservice 1 : Auth & User Management (Port 8001)
+  # =========================================================================
+  user_service:
+    build:
+      context: ./services/user_service
+    container_name: medoc_user_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_users_db
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 4. Microservice 2 : Praticiens & Spécialités (Port 8002)
+  # =========================================================================
+  doctor_service:
+    build:
+      context: ./services/doctor_service
+    container_name: medoc_doctor_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_doctors_db
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 5. Microservice 3 : Dossiers Médicaux & Urgences Patients (Port 8003)
+  # =========================================================================
+  patient_service:
+    build:
+      context: ./services/patient_service
+    container_name: medoc_patient_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_patients_db
+    ports:
+      - "8003:8003"
+    depends_on:
+      - postgres
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 6. Microservice 4 : Agenda & Rendez-vous (Port 8004)
+  # =========================================================================
+  appointment_service:
+    build:
+      context: ./services/appointment_service
+    container_name: medoc_appointment_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_appointments_db
+    ports:
+      - "8004:8004"
+    depends_on:
+      - postgres
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 7. Microservice 5 : Messagerie Temps Réel / Channels (Port 8005)
+  # =========================================================================
+  chat_service:
+    build:
+      context: ./services/chat_service
+    container_name: medoc_chat_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_chats_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8005:8005"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 8. Microservice 6 : Ordonnances, Certificats & PDF (Port 8006)
+  # =========================================================================
+  prescription_service:
+    build:
+      context: ./services/prescription_service
+    container_name: medoc_prescription_service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: medoc_prescriptions_db
+    ports:
+      - "8006:8006"
+    depends_on:
+      - postgres
+    networks:
+      - medoc_network
+
+  # =========================================================================
+  # 9. API Gateway Nginx (Point d'entrée Unique Port 8000)
+  # =========================================================================
+  gateway:
+    build:
+      context: ./gateway
+    container_name: medoc_gateway
+    restart: always
+    ports:
+      - "8000:80"
+    depends_on:
+      - user_service
+      - doctor_service
+      - patient_service
+      - appointment_service
+      - chat_service
+      - prescription_service
+    networks:
+      - medoc_network
+
+networks:
+  medoc_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
