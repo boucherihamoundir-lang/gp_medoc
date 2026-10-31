@@ -1,0 +1,36 @@
+{
+  "hosting": {
+    "site": "drzone-ad80f",
+    "public": ".",
+    "cleanUrls": true,
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/admin",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/medecin",
+        "destination": "/medecin.html"
+      },
+      {
+        "source": "/doctor",
+        "destination": "/doctor.html"
+      },
+      {
+        "source": "/patient",
+        "destination": "/patient.html"
+      }
+    ]
+  },
+  "firestore": [
+    {
+      "database": "default",
+      "rules": "firestore.rules"
+    }
+  ]
+}

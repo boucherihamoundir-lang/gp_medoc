@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -143,7 +143,18 @@
             <div v-else class="w-full h-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-black text-lg">{{ (doctor.firstName||'D')[0] }}{{ (doctor.lastName||'R')[0] }}</div>
           </div>
           <div class="hidden xl:block text-left">
-            <div class="text-xs font-bold leading-tight">{{ doctor.civility }} {{ doctor.firstName }} {{ doctor.lastName }}</div>
+            <div class="text-xs font-bold leading-tight flex items-center gap-1.5">
+              <span>{{ doctor.civility }} {{ doctor.firstName }} {{ doctor.lastName }}</span>
+              <span v-if="doctor.verificationStatus === 'verified'" class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" title="Identité vérifiée (CNI & Selfie)">
+                <i class="fa-solid fa-circle-check mr-0.5"></i> Vérifié
+              </span>
+              <span v-else-if="doctor.verificationStatus === 'rejected'" class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300" title="Vérification refusée - Veuillez renouveler vos documents">
+                <i class="fa-solid fa-circle-xmark mr-0.5"></i> Refusé
+              </span>
+              <span v-else class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" title="Vérification CNI & Selfie en cours">
+                <i class="fa-solid fa-clock mr-0.5"></i> En attente
+              </span>
+            </div>
             <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{{ doctor.specialty }}</div>
           </div>
           <!-- Bouton Déconnexion -->
@@ -171,9 +182,6 @@
   <!-- ==================== AUTHENTICATION & INSCRIPTION SCREEN (SMS OTP) ==================== -->
   <div v-if="!isAuthenticated" class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-100 via-sky-50 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
     <div class="max-w-xl w-full bg-white/95 dark:bg-slate-900/95 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden glass-auth-card my-6">
-      
-      <!-- Drapeau algérien -->
-      <div class="h-2 w-full" style="background: linear-gradient(to right, #006233 50%, #ffffff 50%, #ffffff 70%, #d21034 70%)"></div>
       <div class="bg-gradient-to-r from-blue-700 via-sky-600 to-indigo-700 p-6 text-white text-center relative">
         <div class="w-20 h-20 mx-auto rounded-3xl bg-white p-2 shadow-2xl mb-3 flex items-center justify-center border border-white/20">
           <img src="logo.png" alt="MEDOC" class="w-full h-full object-contain">
@@ -384,6 +392,124 @@
               <input type="text" v-model="authSignupForm.cabinetName" placeholder="Cabinet Médical Santé" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
             </div>
 
+            
+            <!-- ==================== VÉRIFICATION D'IDENTITÉ PRATICIEN (CARTE D'IDENTITÉ & SELFIE) ==================== -->
+            <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-id-card text-sky-600"></i>
+                    <span>Vérification d'Identité Médicale *</span>
+                  </h4>
+                  <p class="text-[10px] text-slate-500 dark:text-slate-400">
+                    Conformité légale : Carte d'identité et selfie visage obligatoires pour valider l'agrément.
+                  </p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                  Obligatoire
+                </span>
+              </div>
+
+              <!-- Numéro de pièce d'identité -->
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                  Numéro de Carte Nationale d'Identité ou Passeport
+                </label>
+                <input 
+                  type="text" 
+                  v-model="authSignupForm.identityCardNumber" 
+                  placeholder="Ex : 10XXXXXXXXX (CNI biométrique)" 
+                  class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono">
+              </div>
+
+              <!-- Grille des 2 uploads : Carte d'identité & Selfie Visage -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                <!-- 1. CARTE D'IDENTITÉ (ID CARD) -->
+                <div class="p-3 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col items-center justify-center text-center relative group hover:border-sky-500 transition">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    id="signupIdCardInput" 
+                    @change="handleSignupIdCardUpload" 
+                    class="hidden">
+
+                  <!-- Prévisualisation si photo chargée -->
+                  <div v-if="authSignupForm.idCardPhoto" class="w-full space-y-2">
+                    <div class="relative w-full h-28 rounded-xl overflow-hidden border border-emerald-500/40 shadow-sm bg-slate-100 dark:bg-slate-900">
+                      <img :src="authSignupForm.idCardPhoto" alt="Pièce d'identité" class="w-full h-full object-cover">
+                      <span class="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold flex items-center gap-1 shadow">
+                        <i class="fa-solid fa-check"></i> Importé
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px]">
+                      <span class="text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">✓ Carte d'identité OK</span>
+                      <button 
+                        type="button" 
+                        @click="authSignupForm.idCardPhoto = ''" 
+                        class="text-rose-500 hover:text-rose-700 font-semibold text-[10px]">
+                        Changer
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Bouton d'upload si vide -->
+                  <label v-else for="signupIdCardInput" class="cursor-pointer w-full py-4 flex flex-col items-center justify-center gap-1.5">
+                    <div class="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg group-hover:scale-105 transition">
+                      <i class="fa-solid fa-address-card"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">1. Carte d'Identité *</span>
+                    <span class="text-[10px] text-slate-400">Photo nette recto de la CNI / Passeport</span>
+                    <span class="mt-1 px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-[10px] font-semibold text-sky-600 dark:text-sky-400 shadow-sm">
+                      <i class="fa-solid fa-upload mr-1"></i> Importer CNI
+                    </span>
+                  </label>
+                </div>
+
+                <!-- 2. SELFIE VISAGE (SELFIE FACE) -->
+                <div class="p-3 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col items-center justify-center text-center relative group hover:border-teal-500 transition">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="user" 
+                    id="signupSelfieInput" 
+                    @change="handleSignupSelfieUpload" 
+                    class="hidden">
+
+                  <!-- Prévisualisation si selfie chargé -->
+                  <div v-if="authSignupForm.selfiePhoto" class="w-full space-y-2">
+                    <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-100 dark:bg-slate-900">
+                      <img :src="authSignupForm.selfiePhoto" alt="Selfie visage" class="w-full h-full object-cover">
+                      <span class="absolute bottom-0 inset-x-0 bg-emerald-600/90 text-white text-[8px] font-bold py-0.5 text-center">
+                        Vérifié
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px]">
+                      <span class="text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">✓ Selfie visage OK</span>
+                      <button 
+                        type="button" 
+                        @click="authSignupForm.selfiePhoto = ''" 
+                        class="text-rose-500 hover:text-rose-700 font-semibold text-[10px]">
+                        Reprendre
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Bouton d'upload / prise de selfie si vide -->
+                  <label v-else for="signupSelfieInput" class="cursor-pointer w-full py-4 flex flex-col items-center justify-center gap-1.5">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 flex items-center justify-center text-lg group-hover:scale-105 transition">
+                      <i class="fa-solid fa-camera"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200">2. Selfie Visage *</span>
+                    <span class="text-[10px] text-slate-400">Photo de votre visage de face</span>
+                    <span class="mt-1 px-2.5 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-[10px] font-semibold text-teal-600 dark:text-teal-400 shadow-sm">
+                      <i class="fa-solid fa-camera mr-1"></i> Prendre un Selfie
+                    </span>
+                  </label>
+                </div>
+
+              </div>
+            </div>
             <!-- Choix de la méthode d'inscription -->
             <div class="pt-2">
               <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5">Méthode de validation du compte :</label>
@@ -459,7 +585,7 @@
 
                 <button 
                   type="submit" 
-                  :disabled="authLoading || !authSignupForm.email || !authSignupForm.password || authSignupForm.password.length < 6 || !authSignupForm.lastName || !authSignupForm.wilaya"
+                  :disabled="authLoading || !authSignupForm.email || !authSignupForm.password || authSignupForm.password.length < 6 || !authSignupForm.lastName || !authSignupForm.wilaya || !authSignupForm.idCardPhoto || !authSignupForm.selfiePhoto"
                   class="w-full py-3 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-sky-500/20 hover:opacity-95 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-2">
                   <i class="fa-solid fa-user-plus" :class="authLoading ? 'animate-spin' : ''"></i>
                   <span>{{ authLoading ? 'Création en cours...' : 'Créer mon compte avec Email ✉️' }}</span>
@@ -490,7 +616,7 @@
 
                 <button 
                   type="submit" 
-                  :disabled="authLoading || !authSignupForm.phone || authSignupForm.phone.length < 8 || !authSignupForm.lastName || !authSignupForm.wilaya"
+                  :disabled="authLoading || !authSignupForm.phone || authSignupForm.phone.length < 8 || !authSignupForm.lastName || !authSignupForm.wilaya || !authSignupForm.idCardPhoto || !authSignupForm.selfiePhoto"
                   class="w-full py-3 bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-sky-500/20 hover:opacity-95 transition flex items-center justify-center gap-2 disabled:opacity-50 mt-2">
                   <i class="fa-solid fa-paper-plane" :class="authLoading ? 'animate-spin' : ''"></i>
                   <span>{{ authLoading ? 'Envoi du SMS...' : 'Créer mon compte & Recevoir le SMS 📲' }}</span>
@@ -1285,7 +1411,74 @@
                 <input type="text" v-model="doctor.rpps" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium font-mono">
               </div>
 
-              <div class="sm:col-span-2">
+              <!-- Section Documents d'Identité & Vérification KYC Praticien -->
+          <div class="sm:col-span-2 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+                  <span>Documents de Vérification d'Identité (KYC)</span>
+                </h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Pièce d'identité et selfie visage validant l'agrément officiel de votre cabinet.
+                </p>
+              </div>
+              <span 
+                :class="doctor.verificationStatus === 'verified' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : (doctor.verificationStatus === 'rejected' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300')"
+                class="px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-sm">
+                <i :class="doctor.verificationStatus === 'verified' ? 'fa-solid fa-circle-check text-emerald-600' : (doctor.verificationStatus === 'rejected' ? 'fa-solid fa-circle-xmark text-rose-600' : 'fa-solid fa-clock text-amber-600')"></i>
+                <span>{{ doctor.verificationStatus === 'verified' ? 'Compte Vérifié ✓' : (doctor.verificationStatus === 'rejected' ? 'Vérification Refusée' : 'Vérification en attente') }}</span>
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <!-- Carte d'Identité Preview / Upload -->
+              <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-id-card text-sky-600"></i>
+                    <span>Carte d'Identité</span>
+                  </span>
+                  <span class="text-[10px] text-slate-400 font-mono">{{ doctor.identityCardNumber || 'N° non renseigné' }}</span>
+                </div>
+                <div class="w-full h-32 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                  <img v-if="doctor.idCardPhoto" :src="doctor.idCardPhoto" alt="Carte d'Identité" class="w-full h-full object-cover">
+                  <div v-else class="text-center p-3 text-slate-400 text-xs">
+                    <i class="fa-solid fa-id-card text-2xl mb-1 opacity-40"></i>
+                    <p class="text-[10px]">Aucune pièce d'identité importée</p>
+                  </div>
+                </div>
+                <label class="block w-full py-1.5 px-3 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 rounded-lg text-[11px] font-bold text-center text-sky-700 dark:text-sky-300 cursor-pointer hover:bg-sky-100 transition">
+                  <i class="fa-solid fa-upload mr-1"></i> Remplacer la carte d'identité
+                  <input type="file" accept="image/*" @change="handleProfileIdCardUpload" class="hidden">
+                </label>
+              </div>
+
+              <!-- Selfie Visage Preview / Upload -->
+              <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-camera text-teal-600"></i>
+                    <span>Selfie Visage</span>
+                  </span>
+                  <span class="text-[10px] text-emerald-600 font-semibold">Vérification faciale</span>
+                </div>
+                <div class="w-full h-32 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                  <img v-if="doctor.selfiePhoto" :src="doctor.selfiePhoto" alt="Selfie Visage" class="w-full h-full object-cover">
+                  <div v-else class="text-center p-3 text-slate-400 text-xs">
+                    <i class="fa-solid fa-camera text-2xl mb-1 opacity-40"></i>
+                    <p class="text-[10px]">Aucun selfie visage importé</p>
+                  </div>
+                </div>
+                <label class="block w-full py-1.5 px-3 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 rounded-lg text-[11px] font-bold text-center text-teal-700 dark:text-teal-300 cursor-pointer hover:bg-teal-100 transition">
+                  <i class="fa-solid fa-camera mr-1"></i> Reprendre le selfie visage
+                  <input type="file" accept="image/*" capture="user" @change="handleProfileSelfieUpload" class="hidden">
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="sm:col-span-2">
                 <label class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">Spécialité Principale</label>
                 <input type="text" v-model="doctor.specialty" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium">
               </div>

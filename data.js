@@ -11,6 +11,11 @@ const defaultDoctorProfile = {
   adeli: "",
   bio: "",
   avatar: "",
+  // Vérification d'identité & Agrément (ID Card + Selfie)
+  idCardPhoto: "",
+  selfiePhoto: "",
+  identityCardNumber: "",
+  verificationStatus: "pending", // 'unverified', 'pending', 'verified'
   status: "available", // available, in_consultation, away
   statusMessage: "Disponible au cabinet",
 

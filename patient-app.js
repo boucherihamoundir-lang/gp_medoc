@@ -422,6 +422,7 @@ const patientApp = createApp({
                 email: data.email || '',
                 avatar: data.avatar || '',
                 teleconsultation: data.teleconsultation !== false,
+                verificationStatus: data.verificationStatus || 'pending',
                 about: data.bio || ''
               });
             });

@@ -123,7 +123,11 @@ const app = createApp({
       phone: '',
       email: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      identityCardNumber: '',
+      idCardPhoto: '',
+      selfiePhoto: '',
+      verificationStatus: 'pending'
     });
 
     // --- DONNÉES PATIENTS & AGENDA (VIDE PAR DÉFAUT) ---
@@ -364,6 +368,81 @@ const app = createApp({
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
+    };
+
+    // Helper pour redimensionner et convertir une image en base64
+    const processImageUpload = (file, maxDim, quality, callback) => {
+      if (!file || !file.type.startsWith('image/')) {
+        notify('Format non supporté', 'Veuillez sélectionner un fichier image (JPG, PNG, WebP).', 'warning');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width;
+          let h = img.height;
+          if (w > h && w > maxDim) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else if (h > maxDim) {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          callback(dataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleSignupIdCardUpload = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      processImageUpload(file, 800, 0.85, (dataUrl) => {
+        authSignupForm.value.idCardPhoto = dataUrl;
+        notify("Carte d'identité enregistrée", "Votre pièce d'identité a été importée avec succès.", "success");
+      });
+    };
+
+    const handleSignupSelfieUpload = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      processImageUpload(file, 400, 0.85, (dataUrl) => {
+        authSignupForm.value.selfiePhoto = dataUrl;
+        notify("Selfie visage enregistré", "Votre selfie de vérification faciale a été validé.", "success");
+      });
+    };
+
+    const handleProfileIdCardUpload = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      processImageUpload(file, 800, 0.85, (dataUrl) => {
+        doctor.value.idCardPhoto = dataUrl;
+        doctor.value.verificationStatus = 'pending';
+        saveDoctorDataLocally();
+        syncProfileToFirebase();
+        notify("Pièce d'identité mise à jour", "Document soumis pour validation administrative.", "success");
+      });
+    };
+
+    const handleProfileSelfieUpload = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      processImageUpload(file, 400, 0.85, (dataUrl) => {
+        doctor.value.selfiePhoto = dataUrl;
+        if (!doctor.value.avatar) doctor.value.avatar = dataUrl;
+        doctor.value.verificationStatus = 'pending';
+        saveDoctorDataLocally();
+        syncProfileToFirebase();
+        notify("Selfie visage mis à jour", "Photo enregistrée et soumise pour validation.", "success");
+      });
     };
 
     // --- AGENDA & RENDEZ-VOUS ---
@@ -929,6 +1008,10 @@ const app = createApp({
           address: doctor.value.address || '',
           city: doctor.value.city || '',
           bio: doctor.value.bio || '',
+          identityCardNumber: doctor.value.identityCardNumber || '',
+          idCardPhoto: doctor.value.idCardPhoto || '',
+          selfiePhoto: doctor.value.selfiePhoto || '',
+          verificationStatus: doctor.value.verificationStatus || 'pending',
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
@@ -938,19 +1021,52 @@ const app = createApp({
       }
     };
 
+    let doctorProfileUnsubscribe = null;
     const loadDataFromFirebase = async () => {
       if (!window.db) return;
       try {
         const currentUser = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
         if (!currentUser) return;
-        // Lire depuis /users/{uid} (nouveau schéma)
-        const docRef = await window.db.collection('users').doc(currentUser.uid).get();
-        if (docRef.exists) {
-          const d = docRef.data();
-          doctor.value = { ...doctor.value, ...d, id: currentUser.uid };
-          if (doctor.value.theme) theme.value = doctor.value.theme;
-          if (doctor.value.darkMode !== undefined) darkMode.value = doctor.value.darkMode;
+
+        if (doctorProfileUnsubscribe) {
+          doctorProfileUnsubscribe();
+          doctorProfileUnsubscribe = null;
         }
+
+        return new Promise((resolve) => {
+          let isFirst = true;
+          doctorProfileUnsubscribe = window.db.collection('users').doc(currentUser.uid).onSnapshot((docRef) => {
+            if (docRef && docRef.exists) {
+              const d = docRef.data();
+              const prevVerification = doctor.value.verificationStatus;
+
+              doctor.value = { ...doctor.value, ...d, id: currentUser.uid };
+              if (doctor.value.theme) theme.value = doctor.value.theme;
+              if (doctor.value.darkMode !== undefined) darkMode.value = doctor.value.darkMode;
+
+              // Notification si l'administrateur a validé ou modifié le statut dans la Console Firebase
+              if (!isFirst && prevVerification && prevVerification !== d.verificationStatus) {
+                if (d.verificationStatus === 'verified') {
+                  notify('Compte Validé ! 🎉', 'Vos pièces d\'identité et votre agrément ont été validés par l\'administrateur. Votre profil affiche le badge officiel Vérifié.', 'success');
+                } else if (d.verificationStatus === 'rejected') {
+                  notify('Vérification Refusée', 'Vos pièces justificatives ont été refusées par l\'administrateur. Veuillez importer de nouveaux documents dans vos paramètres de profil.', 'error');
+                }
+              }
+
+              saveDoctorDataLocally();
+            }
+            if (isFirst) {
+              isFirst = false;
+              resolve();
+            }
+          }, (err) => {
+            console.warn('Erreur écoute profil Firestore:', err);
+            if (isFirst) {
+              isFirst = false;
+              resolve();
+            }
+          });
+        });
       } catch (err) {
         console.warn('Impossible de charger depuis Firestore, utilisation du cache local:', err);
       }
@@ -1035,6 +1151,14 @@ const app = createApp({
 
       if (isSignup && (!authSignupForm.value.firstName || !authSignupForm.value.lastName)) {
         notify('Champs incomplets', 'Veuillez renseigner votre nom et prénom de praticien.', 'warning');
+        return;
+      }
+      if (isSignup && !authSignupForm.value.idCardPhoto) {
+        notify("Pièce d'identité requise", "Veuillez importer la photo ou le scan de votre carte d'identité pour vérifier votre compte.", 'warning');
+        return;
+      }
+      if (isSignup && !authSignupForm.value.selfiePhoto) {
+        notify("Selfie visage requis", "Veuillez prendre ou importer votre selfie visage pour la vérification du compte praticien.", 'warning');
         return;
       }
 
@@ -1149,6 +1273,13 @@ const app = createApp({
             doctor.value.wilaya = authSignupForm.value.wilaya;
             doctor.value.city = authSignupForm.value.wilaya || 'Alger';
             doctor.value.country = 'Algérie';
+            doctor.value.idCardPhoto = authSignupForm.value.idCardPhoto || '';
+            doctor.value.selfiePhoto = authSignupForm.value.selfiePhoto || '';
+            doctor.value.identityCardNumber = authSignupForm.value.identityCardNumber || '';
+            doctor.value.verificationStatus = 'pending';
+            if (!doctor.value.avatar && authSignupForm.value.selfiePhoto) {
+              doctor.value.avatar = authSignupForm.value.selfiePhoto;
+            }
             const cleanPhone = (authSignupForm.value.phone || '').trim().replace(/^0+/, '').replace(/\s+/g, '');
             doctor.value.phoneOffice = `+213 ${cleanPhone}`;
             doctor.value.phoneEmergency = `+213 ${cleanPhone}`;
@@ -1205,6 +1336,14 @@ const app = createApp({
         notify('Wilaya requise', 'Veuillez sélectionner votre wilaya parmi les 58 wilayas.', 'warning');
         return;
       }
+      if (!authSignupForm.value.idCardPhoto) {
+        notify("Pièce d'identité requise", "Veuillez importer la photo ou le scan de votre carte d'identité pour vérifier votre compte.", 'warning');
+        return;
+      }
+      if (!authSignupForm.value.selfiePhoto) {
+        notify("Selfie visage requis", "Veuillez prendre ou importer votre selfie visage pour la vérification du compte praticien.", 'warning');
+        return;
+      }
 
       authLoading.value = true;
       try {
@@ -1246,6 +1385,13 @@ const app = createApp({
         doctor.value.city = authSignupForm.value.wilaya || 'Alger';
         doctor.value.country = 'Algérie';
         doctor.value.email = email;
+        doctor.value.idCardPhoto = authSignupForm.value.idCardPhoto || '';
+        doctor.value.selfiePhoto = authSignupForm.value.selfiePhoto || '';
+        doctor.value.identityCardNumber = authSignupForm.value.identityCardNumber || '';
+        doctor.value.verificationStatus = 'pending';
+        if (!doctor.value.avatar && authSignupForm.value.selfiePhoto) {
+          doctor.value.avatar = authSignupForm.value.selfiePhoto;
+        }
         if (authSignupForm.value.phone) {
           const cleanPhone = authSignupForm.value.phone.trim().replace(/^0+/, '').replace(/\s+/g, '');
           doctor.value.phoneOffice = `+213 ${cleanPhone}`;
@@ -1387,6 +1533,10 @@ const app = createApp({
     };
 
     const logoutDoctor = () => {
+      if (doctorProfileUnsubscribe) {
+        try { doctorProfileUnsubscribe(); } catch (e) {}
+        doctorProfileUnsubscribe = null;
+      }
       if (typeof firebase !== 'undefined' && firebase.auth) {
         try { firebase.auth().signOut(); } catch (e) {}
       }
@@ -1465,6 +1615,10 @@ const app = createApp({
       addDegree,
       removeDegree,
       handleDoctorPfpUpload,
+      handleSignupIdCardUpload,
+      handleSignupSelfieUpload,
+      handleProfileIdCardUpload,
+      handleProfileSelfieUpload,
       updateAppointmentStatus,
       deleteAppointment,
       openNewAppointmentModal,

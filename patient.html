@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
@@ -755,7 +755,13 @@
                   <div class="flex items-center justify-between">
                     <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 truncate">
                       <span>{{ doc.civility }} {{ doc.name }}</span>
-                      <i class="fa-solid fa-certificate text-sky-500 text-xs" title="Praticien Vérifié"></i>
+                      <span v-if="doc.verificationStatus === 'verified'" class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" title="Identité & Agréments Officiellement Vérifiés">
+                        <i class="fa-solid fa-circle-check"></i> Vérifié
+                      </span>
+                      <span v-else class="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900" title="Vérification des pièces justificatives en cours">
+                        <i class="fa-solid fa-clock"></i> En cours
+                      </span>
+                      
                     </h3>
                     <div class="flex items-center gap-1 text-amber-500 text-xs font-bold">
                       <i class="fa-solid fa-star"></i>
@@ -1544,7 +1550,13 @@
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <span>{{ selectedDoctorForDetails.civility }} {{ selectedDoctorForDetails.name }}</span>
-              <i class="fa-solid fa-certificate text-sky-500 text-xs"></i>
+              <span v-if="selectedDoctorForDetails.verificationStatus === 'verified'" class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" title="Identité & Agréments Officiellement Vérifiés">
+                <i class="fa-solid fa-circle-check"></i> Praticien Vérifié
+              </span>
+              <span v-else class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" title="Vérification en attente">
+                <i class="fa-solid fa-clock"></i> En cours
+              </span>
+              
             </h3>
             <p class="text-xs font-bold text-sky-600 dark:text-sky-400">{{ selectedDoctorForDetails.specialty }}</p>
             <p class="text-[11px] text-slate-500">{{ selectedDoctorForDetails.cabinetName }} • Wilaya de {{ selectedDoctorForDetails.wilaya }}</p>

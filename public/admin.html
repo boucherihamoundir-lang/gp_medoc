@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DrZone - Administration & Validation des Médecins</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Firebase Config -->
+  <script src="firebase-config.js"></script>
+
+  <style>
+    [v-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-full flex flex-col font-sans">
+  <div id="admin-app" v-cloak class="flex-1 flex flex-col">
+    
+    <!-- PIN Screen if not authenticated -->
+    <div v-if="!isAdminUnlocked" class="flex-1 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl border border-slate-200 shadow-xl max-w-sm w-full p-7 text-center space-y-5">
+        <div class="w-16 h-16 mx-auto bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 text-2xl shadow-sm">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-black text-slate-900">DrZone Admin</h1>
+          <p class="text-xs text-slate-500 mt-1">Espace de validation des médecins et vérification des pièces d'identité</p>
+        </div>
+
+        <form @submit.prevent="unlockAdmin" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 text-left mb-1.5">Code d'accès Administrateur</label>
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input 
+                type="password" 
+                v-model="pinInput" 
+                placeholder="Entrez le code PIN..."
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                autofocus>
+            </div>
+            <p v-if="pinError" class="text-xs text-rose-600 font-semibold mt-1.5 text-left">
+              <i class="fa-solid fa-circle-exclamation mr-1"></i> {{ pinError }}
+            </p>
+          </div>
+
+          <button 
+            type="submit" 
+            class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+            <span>Accéder au panneau</span>
+            <i class="fa-solid fa-arrow-right text-xs"></i>
+          </button>
+        </form>
+
+        <p class="text-[11px] text-slate-400">
+          Code par défaut : <strong class="text-slate-600 font-mono">admin2026</strong>
+        </p>
+      </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div v-else class="flex-1 flex flex-col">
+      <!-- Top Navigation -->
+      <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-sm">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 class="text-base font-black text-slate-900 leading-tight">DrZone Admin</h1>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Console KYC</span>
+              </div>
+              <p class="text-[11px] text-slate-500">Vérification CNI & Selfie en temps réel</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <!-- Refresh Button -->
+            <button 
+              @click="fetchDoctors" 
+              class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-rotate" :class="{ 'fa-spin': isLoading }"></i>
+              <span class="hidden sm:inline">Actualiser</span>
+            </button>
+
+            <!-- Links to portals -->
+            <a href="/medecin" target="_blank" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-user-doctor text-emerald-600"></i>
+              <span class="hidden sm:inline">Portail Médecin</span>
+            </a>
+
+            <!-- Lock / Logout -->
+            <button 
+              @click="lockAdmin" 
+              class="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 hover:bg-rose-100 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              <span class="hidden sm:inline">Verrouiller</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
+        
+        <!-- Stats Summary -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Médecins</p>
+              <h3 class="text-2xl font-black text-slate-900 mt-1">{{ doctors.length }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-user-doctor"></i>
+            </div>
+          </div>
+
+          <div @click="filterStatus = 'pending'" class="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-amber-400 transition" :class="{'ring-2 ring-amber-400': filterStatus === 'pending'}">
+            <div>
+              <p class="text-xs font-bold text-amber-600 uppercase tracking-wide">En attente (KYC)</p>
+              <h3 class="text-2xl font-black text-amber-700 mt-1">{{ countByStatus('pending') }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-clock"></i>
+            </div>
+          </div>
+
+          <div @click="filterStatus = 'verified'" class="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-emerald-400 transition" :class="{'ring-2 ring-emerald-400': filterStatus === 'verified'}">
+            <div>
+              <p class="text-xs font-bold text-emerald-600 uppercase tracking-wide">Comptes Validés</p>
+              <h3 class="text-2xl font-black text-emerald-700 mt-1">{{ countByStatus('verified') }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+          </div>
+
+          <div @click="filterStatus = 'rejected'" class="bg-white p-5 rounded-2xl border border-rose-200 shadow-sm flex items-center justify-between cursor-pointer hover:border-rose-400 transition" :class="{'ring-2 ring-rose-400': filterStatus === 'rejected'}">
+            <div>
+              <p class="text-xs font-bold text-rose-600 uppercase tracking-wide">Refusés</p>
+              <h3 class="text-2xl font-black text-rose-700 mt-1">{{ countByStatus('rejected') }}</h3>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
+              <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              @click="filterStatus = 'all'" 
+              :class="filterStatus === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+              class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition">
+              Tous ({{ doctors.length }})
+            </button>
+            <button 
+              @click="filterStatus = 'pending'" 
+              :class="filterStatus === 'pending' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'"
+              class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+              <i class="fa-solid fa-clock text-[10px]"></i>
+              <span>En attente ({{ countByStatus('pending') }})</span>
+            </button>
+            <button 
+              @click="filterStatus = 'verified'" 
+              :class="filterStatus === 'verified' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'"
+              class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check text-[10px]"></i>
+              <span>Validés ({{ countByStatus('verified') }})</span>
+            </button>
+            <button 
+              @click="filterStatus = 'rejected'" 
+              :class="filterStatus === 'rejected' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'"
+              class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-xmark text-[10px]"></i>
+              <span>Refusés ({{ countByStatus('rejected') }})</span>
+            </button>
+          </div>
+
+          <!-- Search box -->
+          <div class="relative w-full sm:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input 
+              type="text" 
+              v-model="searchQuery" 
+              placeholder="Rechercher par nom, email, CNI..."
+              class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+        </div>
+
+        <!-- Doctors List -->
+        <div v-if="filteredDoctors.length > 0" class="space-y-4">
+          <div 
+            v-for="doc in filteredDoctors" 
+            :key="doc.id" 
+            class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition space-y-4">
+            
+            <!-- Doctor Header Row -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl overflow-hidden ring-2 ring-slate-100 bg-slate-100 flex-shrink-0">
+                  <img v-if="doc.avatar" :src="doc.avatar" class="w-full h-full object-cover">
+                  <div v-else class="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl">
+                    {{ (doc.name || 'D')[0] }}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-bold text-slate-900">{{ doc.civility || 'Dr.' }} {{ doc.firstName }} {{ doc.lastName }}</h3>
+                    <!-- Status Badge -->
+                    <span 
+                      v-if="doc.verificationStatus === 'verified'" 
+                      class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <i class="fa-solid fa-circle-check text-emerald-600"></i> Validé ✓
+                    </span>
+                    <span 
+                      v-else-if="doc.verificationStatus === 'rejected'" 
+                      class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 flex items-center gap-1">
+                      <i class="fa-solid fa-circle-xmark text-rose-600"></i> Refusé
+                    </span>
+                    <span 
+                      v-else 
+                      class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                      <i class="fa-solid fa-clock text-amber-600"></i> En attente de validation
+                    </span>
+                  </div>
+
+                  <p class="text-xs text-emerald-700 font-bold mt-0.5">{{ doc.specialty || 'Médecin' }} • {{ doc.cabinetName || 'Cabinet' }}</p>
+                  
+                  <div class="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-500">
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-envelope text-slate-400"></i> {{ doc.email || 'Email non renseigné' }}</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-phone text-slate-400"></i> {{ doc.phone || doc.phoneOffice || 'N/A' }}</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-location-dot text-slate-400"></i> Wilaya : <strong>{{ doc.wilaya || 'N/A' }}</strong> ({{ doc.city || 'Centre' }})</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-id-card text-slate-400"></i> N° CNI : <strong class="font-mono text-slate-700">{{ doc.identityCardNumber || 'Non renseigné' }}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <button 
+                  v-if="doc.verificationStatus !== 'verified'"
+                  @click="updateDoctorStatus(doc, 'verified')"
+                  class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-check"></i>
+                  <span>Accepter & Valider</span>
+                </button>
+
+                <button 
+                  v-if="doc.verificationStatus !== 'rejected'"
+                  @click="updateDoctorStatus(doc, 'rejected')"
+                  class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-xmark"></i>
+                  <span>Refuser</span>
+                </button>
+
+                <button 
+                  v-if="doc.verificationStatus !== 'pending'"
+                  @click="updateDoctorStatus(doc, 'pending')"
+                  class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition"
+                  title="Remettre en attente">
+                  <i class="fa-solid fa-rotate-left"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- KYC Documents Preview Grid -->
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-images text-emerald-600"></i>
+                <span>Pièces Justificatives Téléversées</span>
+              </h4>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                <!-- ID Card Image Card -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                      <i class="fa-solid fa-id-card text-sky-600"></i> Carte d'Identité / Passeport
+                    </span>
+                    <span v-if="doc.idCardPhoto" class="text-[10px] text-emerald-600 font-bold">Fournie ✓</span>
+                    <span v-else class="text-[10px] text-slate-400">Non fournie</span>
+                  </div>
+
+                  <div 
+                    class="h-48 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center relative group cursor-pointer"
+                    @click="doc.idCardPhoto && openImageZoom(doc.idCardPhoto, 'Carte d\'Identité - ' + (doc.name || 'Médecin'))">
+                    <img 
+                      v-if="doc.idCardPhoto" 
+                      :src="doc.idCardPhoto" 
+                      alt="Carte d'Identité" 
+                      class="w-full h-full object-contain bg-slate-900 group-hover:scale-105 transition duration-200">
+                    <div v-else class="text-center p-4 text-slate-400">
+                      <i class="fa-solid fa-id-card text-3xl mb-1.5 opacity-40"></i>
+                      <p class="text-xs font-semibold">Aucune image</p>
+                    </div>
+
+                    <div v-if="doc.idCardPhoto" class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <span class="px-3 py-1.5 bg-white/90 text-slate-900 font-bold text-xs rounded-lg shadow flex items-center gap-1">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i> Agrandir
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Selfie Image Card -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                      <i class="fa-solid fa-camera text-teal-600"></i> Selfie Visage
+                    </span>
+                    <span v-if="doc.selfiePhoto" class="text-[10px] text-emerald-600 font-bold">Fourni ✓</span>
+                    <span v-else class="text-[10px] text-slate-400">Non fourni</span>
+                  </div>
+
+                  <div 
+                    class="h-48 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center relative group cursor-pointer"
+                    @click="doc.selfiePhoto && openImageZoom(doc.selfiePhoto, 'Selfie Visage - ' + (doc.name || 'Médecin'))">
+                    <img 
+                      v-if="doc.selfiePhoto" 
+                      :src="doc.selfiePhoto" 
+                      alt="Selfie Visage" 
+                      class="w-full h-full object-contain bg-slate-900 group-hover:scale-105 transition duration-200">
+                    <div v-else class="text-center p-4 text-slate-400">
+                      <i class="fa-solid fa-camera text-3xl mb-1.5 opacity-40"></i>
+                      <p class="text-xs font-semibold">Aucune image</p>
+                    </div>
+
+                    <div v-if="doc.selfiePhoto" class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <span class="px-3 py-1.5 bg-white/90 text-slate-900 font-bold text-xs rounded-lg shadow flex items-center gap-1">
+                        <i class="fa-solid fa-magnifying-glass-plus"></i> Agrandir
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-3">
+          <div class="w-16 h-16 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 text-2xl">
+            <i class="fa-solid fa-inbox"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-800">Aucun médecin trouvé</h3>
+          <p class="text-xs text-slate-500 max-w-sm mx-auto">
+            Aucun compte médecin ne correspond à votre filtre actuel ({{ filterStatus }}).
+          </p>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- Image Zoom Modal / Lightbox -->
+    <div 
+      v-if="zoomedImage" 
+      class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col p-4 sm:p-8"
+      @click.self="zoomedImage = null">
+      <div class="flex items-center justify-between text-white pb-4 max-w-5xl mx-auto w-full">
+        <h3 class="text-sm font-bold flex items-center gap-2">
+          <i class="fa-solid fa-image text-emerald-400"></i>
+          <span>{{ zoomedImageTitle }}</span>
+        </h3>
+        <button 
+          @click="zoomedImage = null" 
+          class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-lg transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 flex items-center justify-center max-w-5xl mx-auto w-full overflow-hidden">
+        <img 
+          :src="zoomedImage" 
+          :alt="zoomedImageTitle" 
+          class="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain border border-white/10">
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const ADMIN_PIN = 'admin2026';
+        const isAdminUnlocked = ref(localStorage.getItem('drzone_admin_auth') === 'true');
+        const pinInput = ref('');
+        const pinError = ref('');
+
+        const doctors = ref([]);
+        const isLoading = ref(false);
+        const filterStatus = ref('all'); // 'all', 'pending', 'verified', 'rejected'
+        const searchQuery = ref('');
+
+        // Lightbox
+        const zoomedImage = ref(null);
+        const zoomedImageTitle = ref('');
+
+        const unlockAdmin = () => {
+          if (pinInput.value === ADMIN_PIN) {
+            isAdminUnlocked.value = true;
+            localStorage.setItem('drzone_admin_auth', 'true');
+            pinError.value = '';
+            initFirebaseAndListen();
+          } else {
+            pinError.value = 'Code PIN incorrect.';
+          }
+        };
+
+        const lockAdmin = () => {
+          isAdminUnlocked.value = false;
+          localStorage.removeItem('drzone_admin_auth');
+          pinInput.value = '';
+        };
+
+        const openImageZoom = (imgSrc, title) => {
+          zoomedImage.value = imgSrc;
+          zoomedImageTitle.value = title;
+        };
+
+        const initFirebaseAndListen = () => {
+          if (!window.db) {
+            if (typeof window.getMedidocFirestore === 'function') {
+              window.db = window.getMedidocFirestore();
+            }
+          }
+
+          if (!window.db) {
+            setTimeout(initFirebaseAndListen, 500);
+            return;
+          }
+
+          isLoading.value = true;
+          // Listen real-time to all doctors
+          window.db.collection('users').where('role', '==', 'doctor').onSnapshot((snapshot) => {
+            isLoading.value = false;
+            if (!snapshot) return;
+            const list = [];
+            snapshot.forEach(docSnap => {
+              const d = docSnap.data();
+              list.push({
+                id: docSnap.id,
+                ...d
+              });
+            });
+            doctors.value = list;
+          }, (err) => {
+            isLoading.value = false;
+            console.error('Erreur écoute médecins Firestore:', err);
+          });
+        };
+
+        const fetchDoctors = () => {
+          initFirebaseAndListen();
+        };
+
+        const updateDoctorStatus = async (doctor, newStatus) => {
+          if (!window.db) return;
+          try {
+            await window.db.collection('users').doc(doctor.id).update({
+              verificationStatus: newStatus,
+              verifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            doctor.verificationStatus = newStatus;
+          } catch (err) {
+            console.error('Erreur mise à jour statut:', err);
+            alert('Erreur lors de la mise à jour: ' + err.message);
+          }
+        };
+
+        const countByStatus = (status) => {
+          return doctors.value.filter(d => (d.verificationStatus || 'pending') === status).length;
+        };
+
+        const filteredDoctors = computed(() => {
+          return doctors.value.filter(doc => {
+            const status = doc.verificationStatus || 'pending';
+            if (filterStatus.value !== 'all' && status !== filterStatus.value) {
+              return false;
+            }
+            if (!searchQuery.value) return true;
+            const q = searchQuery.value.toLowerCase();
+            const fullName = `${doc.name || ''} ${doc.firstName || ''} ${doc.lastName || ''}`.toLowerCase();
+            const email = (doc.email || '').toLowerCase();
+            const cni = (doc.identityCardNumber || '').toLowerCase();
+            const wilaya = (doc.wilaya || '').toLowerCase();
+            return fullName.includes(q) || email.includes(q) || cni.includes(q) || wilaya.includes(q);
+          });
+        });
+
+        onMounted(() => {
+          if (isAdminUnlocked.value) {
+            initFirebaseAndListen();
+          }
+        });
+
+        return {
+          isAdminUnlocked,
+          pinInput,
+          pinError,
+          unlockAdmin,
+          lockAdmin,
+          doctors,
+          isLoading,
+          filterStatus,
+          searchQuery,
+          zoomedImage,
+          zoomedImageTitle,
+          openImageZoom,
+          fetchDoctors,
+          updateDoctorStatus,
+          countByStatus,
+          filteredDoctors
+        };
+      }
+    }).mount('#admin-app');
+  </script>
+</body>
+</html>
