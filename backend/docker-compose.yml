@@ -158,6 +158,8 @@ services:
     restart: always
     ports:
       - "8000:80"
+    volumes:
+      - ../public:/usr/share/nginx/html:ro
     depends_on:
       - user_service
       - doctor_service
