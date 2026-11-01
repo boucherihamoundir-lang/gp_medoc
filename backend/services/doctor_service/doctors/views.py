@@ -43,20 +43,21 @@ class DoctorProfileManageView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        user_id = request.user.id
+        user_id = getattr(request.user, 'id', None) or getattr(request.user, 'pk', None)
+        token_payload = getattr(request.auth, 'payload', {}) or {}
         profile, _ = DoctorProfile.objects.get_or_create(
             user_id=user_id,
             defaults={
-                'first_name': request.user.first_name,
-                'last_name': request.user.last_name,
-                'email': request.user.email,
+                'first_name': token_payload.get('first_name', getattr(request.user, 'first_name', '')),
+                'last_name': token_payload.get('last_name', getattr(request.user, 'last_name', '')),
+                'email': token_payload.get('email', getattr(request.user, 'email', '')),
             }
         )
         serializer = DoctorProfileSerializer(profile)
         return Response(serializer.data)
 
     def put(self, request):
-        user_id = request.user.id
+        user_id = getattr(request.user, 'id', None) or getattr(request.user, 'pk', None)
         profile, _ = DoctorProfile.objects.get_or_create(user_id=user_id)
         serializer = DoctorProfileSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():

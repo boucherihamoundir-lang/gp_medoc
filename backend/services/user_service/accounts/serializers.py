@@ -5,6 +5,16 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['username'] = user.username
+        token['email'] = user.email
+        token['role'] = user.role
+        token['first_name'] = user.first_name
+        token['last_name'] = user.last_name
+        return token
+
     def validate(self, attrs):
         data = super().validate(attrs)
         # Renvoyer les informations utilisateur directement dans la réponse de login
