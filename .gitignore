@@ -44,6 +44,17 @@ bower_components
 # Compiled binary addons (http://nodejs.org/api/addons.html)
 build/Release
 
+# Python & Django
+*.sqlite3
+db.sqlite3
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
 # Dependency directories
 node_modules/
 
