@@ -5,10 +5,12 @@ from .views import (
     RegisterView,
     ProfileView,
     UserListView,
-    VerifyTokenView
+    VerifyTokenView,
+    AuthRootView
 )
 
 urlpatterns = [
+    path('', AuthRootView.as_view(), name='auth_root'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomLoginView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

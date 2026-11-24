@@ -48,3 +48,24 @@ class VerifyTokenView(APIView):
             "username": request.user.username,
             "role": request.user.role
         }, status=status.HTTP_200_OK)
+
+class AuthRootView(APIView):
+    """Index interactif de l'API User & Auth Service"""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response({
+            "service": "MEDOC - User & Auth Service (Microservice 1)",
+            "port": 8001,
+            "status": "online",
+            "description": "Gestion des utilisateurs, authentification JWT et comptes praticiens/patients",
+            "endpoints": {
+                "register": "/api/v1/auth/register/",
+                "login": "/api/v1/auth/login/",
+                "profile": "/api/v1/auth/profile/",
+                "users": "/api/v1/auth/users/",
+                "token_refresh": "/api/v1/auth/token/refresh/",
+                "verify": "/api/v1/auth/verify/",
+                "admin": "/admin/"
+            }
+        })
