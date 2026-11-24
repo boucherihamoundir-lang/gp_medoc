@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MEDOC - Portail Médical & Santé Connectée | Choisissez votre espace</title>
+  <title>MEDOC - Portail Médical & Santé Connectée | Prenez RDV en ligne</title>
   <link rel="icon" type="image/png" href="logo.png">
   
   <!-- PWA & Mobile Capabilities -->
@@ -47,7 +47,7 @@
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
-<body class="theme-blue bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased min-h-screen flex flex-col selection:bg-sky-500 selection:text-white transition-colors duration-200">
+<body class="theme-blue bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 antialiased min-h-screen flex flex-col selection:bg-emerald-500 selection:text-white transition-colors duration-200">
 
 <div id="portal-app" class="flex-1 flex flex-col" v-cloak>
 
@@ -63,16 +63,36 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-black text-2xl tracking-wider text-blue-600 dark:text-blue-400">MEDOC</span>
-            <span class="hidden sm:inline px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 rounded-full border border-sky-200 dark:border-sky-800">
-              Services de Santé Innovants
+            <span class="hidden sm:inline px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-200 dark:border-emerald-800">
+              Portail Patient & Santé
             </span>
           </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Portail Médical National • Algérie 🇩🇿</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Santé Connectée • Algérie 🇩🇿</p>
         </div>
       </a>
 
-      <!-- Quick Direct Links & Theme -->
-      <div class="flex items-center gap-2.5 sm:gap-4">
+      <!-- Quick Nav Links for Patient -->
+      <nav class="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600 dark:text-slate-300">
+        <a href="#search-section" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-magnifying-glass text-emerald-500"></i>
+          <span>Trouver un Médecin</span>
+        </a>
+        <a href="#how-it-works" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-question text-sky-500"></i>
+          <span>Comment ça marche</span>
+        </a>
+        <a href="#patient-services" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-heart-pulse text-rose-500"></i>
+          <span>Services Patients</span>
+        </a>
+        <a href="#doctor-section" class="hover:text-sky-600 dark:hover:text-sky-400 transition flex items-center gap-1.5 text-sky-700 dark:text-sky-300">
+          <i class="fa-solid fa-user-doctor text-sky-600"></i>
+          <span>Vous êtes Médecin ?</span>
+        </a>
+      </nav>
+
+      <!-- Actions : Doctor Portal (Small Pill) + Patient Portal (Primary) -->
+      <div class="flex items-center gap-2.5 sm:gap-3">
         <!-- Dark Mode Toggle -->
         <button 
           @click="toggleDarkMode" 
@@ -85,23 +105,26 @@
         <button 
           v-if="canInstall"
           @click="installPWA" 
-          class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 rounded-xl shadow-md shadow-sky-600/25 transition cursor-pointer"
+          class="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition cursor-pointer"
           title="Installer l'application MEDOC">
-          <i class="fa-solid fa-circle-down"></i>
-          <span>Installer l'App</span>
+          <i class="fa-solid fa-circle-down text-sky-500"></i>
+          <span>Installer</span>
         </button>
 
-        <!-- Direct Nav Buttons -->
+        <!-- Petit Bouton Espace Médecin (Pro) -->
         <a 
           href="medecin.html" 
-          class="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800 rounded-xl transition shadow-sm">
-          <i class="fa-solid fa-user-doctor"></i>
-          <span>Espace Médecin</span>
+          class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800 rounded-xl transition shadow-sm"
+          title="Accès réservé aux médecins et cabinets">
+          <i class="fa-solid fa-user-doctor text-sky-600"></i>
+          <span class="hidden sm:inline">Espace Médecin</span>
+          <span class="sm:hidden">Médecin</span>
         </a>
 
+        <!-- Bouton Principal Espace Patient -->
         <a 
           href="patient.html" 
-          class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl transition shadow-md shadow-emerald-600/20">
+          class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl transition shadow-md shadow-emerald-600/20">
           <i class="fa-solid fa-hospital-user"></i>
           <span>Espace Patient</span>
         </a>
@@ -109,212 +132,374 @@
     </div>
   </header>
 
-  <!-- ==================== HERO SELECTION SECTION ==================== -->
-  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 flex flex-col justify-center">
-    
-    <!-- Title & Badge -->
-    <div class="text-center max-w-3xl mx-auto mb-10 sm:mb-14 space-y-4">
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shadow-sm animate-fade-in">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-        <span>Plateforme Santé Connectée • 58 Wilayas d'Algérie</span>
-      </div>
+  <!-- ==================== MAIN CONTENT (PATIENT-CENTRIC) ==================== -->
+  <main class="flex-1 flex flex-col">
 
-      <h1 class="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-        Bienvenue sur <span class="bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">MEDOC</span>
-      </h1>
+    <!-- ==================== HERO SECTION (PATIENT FIRST) ==================== -->
+    <section class="relative overflow-hidden bg-gradient-to-b from-emerald-50/60 via-slate-50 to-white dark:from-slate-900 dark:via-slate-950 dark:to-slate-950 pt-10 pb-16 sm:py-20 border-b border-slate-200 dark:border-slate-800">
       
-      <p class="text-base sm:text-lg text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-        Votre portail de santé intelligent. Veuillez sélectionner votre profil pour accéder à votre espace dédié :
-      </p>
-    </div>
+      <!-- Background Ambient Glow -->
+      <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-r from-emerald-400/15 via-teal-400/15 to-sky-400/15 rounded-full blur-3xl pointer-events-none"></div>
 
-    <!-- ==================== THE 2 BIG SELECTION CARDS ==================== -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10 max-w-5xl mx-auto w-full">
-      
-      <!-- ==================== CARD 1: MEDECIN / PRATICIEN ==================== -->
-      <div class="group relative bg-white dark:bg-slate-900 rounded-3xl border-2 border-sky-100 dark:border-sky-900/60 hover:border-sky-500 dark:hover:border-sky-500 shadow-xl shadow-sky-500/5 hover:shadow-2xl hover:shadow-sky-500/15 transition-all duration-300 overflow-hidden flex flex-col justify-between">
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center text-center">
         
-        <!-- Top Gradient Glow Accent -->
-        <div class="h-3 w-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600"></div>
+        <!-- National Algerian Badge -->
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/80 shadow-sm mb-6">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+          <span>Portail Patient National • 58 Wilayas d'Algérie 🇩🇿</span>
+        </div>
 
-        <div class="p-6 sm:p-8 flex-1 flex flex-col">
+        <!-- Main Catchphrase -->
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight max-w-4xl leading-tight">
+          Prenez rendez-vous en ligne avec votre <span class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">médecin</span> en Algérie
+        </h1>
+        
+        <p class="mt-4 sm:mt-6 text-base sm:text-lg text-slate-600 dark:text-slate-300 font-medium max-w-2xl leading-relaxed">
+          Trouvez un praticien de confiance près de chez vous, réservez une consultation au cabinet ou en téléconsultation vidéo, et gérez tout votre dossier médical en toute sécurité.
+        </p>
+
+        <!-- ==================== INTERACTIVE SEARCH BOX FOR PATIENTS ==================== -->
+        <div id="search-section" class="w-full max-w-4xl mt-8 sm:mt-10 bg-white dark:bg-slate-900 rounded-3xl p-3 sm:p-4 shadow-2xl shadow-emerald-500/10 border-2 border-emerald-100 dark:border-emerald-900/60">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3">
+            
+            <!-- 1. Search Query (Doctor Name / Specialty) -->
+            <div class="md:col-span-5 relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-stethoscope text-emerald-600"></i>
+              </div>
+              <input 
+                type="text" 
+                v-model="searchQuery"
+                @keyup.enter="performSearch"
+                placeholder="Médecin, spécialité (ex: Cardiologue, Pédiatre...)"
+                class="w-full pl-10 pr-3 py-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+            </div>
+
+            <!-- 2. Wilaya Selector (58 Wilayas) -->
+            <div class="md:col-span-4 relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-location-dot text-sky-600"></i>
+              </div>
+              <select 
+                v-model="selectedWilaya"
+                class="w-full pl-10 pr-8 py-3.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition appearance-none">
+                <option value="">Toutes les 58 Wilayas</option>
+                <option v-for="w in wilayas" :key="w.code" :value="w.name">
+                  {{ w.code }} - {{ w.name }}
+                </option>
+              </select>
+              <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-chevron-down text-xs"></i>
+              </div>
+            </div>
+
+            <!-- 3. Search Action Button -->
+            <div class="md:col-span-3">
+              <button 
+                @click="performSearch"
+                class="w-full h-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Rechercher</span>
+              </button>
+            </div>
+
+          </div>
+
+          <!-- Quick Filters Bar (Type & Quick Access) -->
+          <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+              <span class="font-bold">Mode de consultation :</span>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="filterTeleconsult" class="rounded text-emerald-600 focus:ring-emerald-500">
+                <span class="font-semibold text-slate-700 dark:text-slate-300">Visioconsultation uniquement</span>
+              </label>
+            </div>
+
+            <a href="patient.html?tab=doctors" class="font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+              <span>Voir tous les médecins</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- ==================== SPECIALTY PILLS ==================== -->
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-3xl">
+          <span class="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">Populaire :</span>
+          <button 
+            v-for="spec in popularSpecialties" 
+            :key="spec.name"
+            @click="searchBySpecialty(spec.name)"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-full border border-slate-200 dark:border-slate-700 shadow-sm transition group">
+            <i :class="[spec.icon, 'text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform']"></i>
+            <span>{{ spec.name }}</span>
+          </button>
+        </div>
+
+        <!-- ==================== KEY REASSURANCE BAR ==================== -->
+        <div class="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-4xl text-center">
+          <div class="p-3 bg-white/70 dark:bg-slate-900/70 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="text-emerald-600 dark:text-emerald-400 font-black text-lg">58 Wilayas</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Couverture nationale</div>
+          </div>
+          <div class="p-3 bg-white/70 dark:bg-slate-900/70 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="text-teal-600 dark:text-teal-400 font-black text-lg">24h/24 & 7j/7</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Prise de RDV en ligne</div>
+          </div>
+          <div class="p-3 bg-white/70 dark:bg-slate-900/70 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="text-sky-600 dark:text-sky-400 font-black text-lg">100% Gratuit</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Pour les patients</div>
+          </div>
+          <div class="p-3 bg-white/70 dark:bg-slate-900/70 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="text-indigo-600 dark:text-indigo-400 font-black text-lg">Chiffré & Sûr</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Secret médical respecté</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== PATIENT SERVICES SECTION ==================== -->
+    <section id="patient-services" class="py-14 sm:py-20 bg-white dark:bg-slate-900 transition-colors">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto mb-12 space-y-3">
+          <span class="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold uppercase tracking-wider rounded-full border border-emerald-200 dark:border-emerald-800">
+            Tout pour votre santé
+          </span>
+          <h2 class="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white">
+            Un portail pensé pour simplifier la vie des patients
+          </h2>
+          <p class="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-medium">
+            Accédez à tous vos services de soins depuis votre ordinateur ou votre téléphone (PWA installable).
+          </p>
+        </div>
+
+        <!-- 4 Grid Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           
-          <!-- Badge & Icon -->
-          <div class="flex items-center justify-between mb-6">
-            <span class="px-3 py-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-xs font-extrabold uppercase tracking-wider rounded-full border border-sky-200 dark:border-sky-800 flex items-center gap-1.5">
-              <i class="fa-solid fa-stethoscope text-sky-600"></i>
-              Praticiens & Cliniques
-            </span>
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-sky-500/25 group-hover:scale-110 transition-transform">
-              <i class="fa-solid fa-user-doctor"></i>
+          <!-- Card 1 -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/80 hover:border-emerald-500 dark:hover:border-emerald-500 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-calendar-check"></i>
+              </div>
+              <h3 class="text-lg font-black text-slate-900 dark:text-white mb-2">Prise de RDV 24h/24</h3>
+              <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Réservez instantanément votre créneau avec le praticien de votre choix, sans attente au téléphone ni déplacement inutile.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-700/60">
+              <a href="patient.html?tab=doctors" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1.5">
+                <span>Prendre un rendez-vous</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </a>
             </div>
           </div>
 
-          <!-- Card Title & Pitch -->
-          <div class="space-y-2 mb-6">
-            <h2 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Espace Médecin</span>
-              <i class="fa-solid fa-arrow-right text-sky-500 text-lg opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300">
-              Solution complète de gestion de cabinet médical, consultations physiques & visioconsultations pour les professionnels de santé.
-            </p>
+          <!-- Card 2 -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/80 hover:border-teal-500 dark:hover:border-teal-500 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-video"></i>
+              </div>
+              <h3 class="text-lg font-black text-slate-900 dark:text-white mb-2">Téléconsultation Vidéo</h3>
+              <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Consultez à distance en visio HD sécurisée depuis n'importe quelle wilaya pour un avis médical rapide ou un renouvellement.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-700/60">
+              <a href="patient.html?teleconsult=1" class="text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1.5">
+                <span>Médecins en téléconsultation</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </a>
+            </div>
           </div>
 
-          <!-- Feature Bullets -->
-          <ul class="space-y-3 mb-8 flex-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-sky-600 dark:text-sky-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Gestion de cabinet & Agenda</strong> (rendez-vous physiques et téléconsultations en direct).</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-sky-600 dark:text-sky-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Dossiers Médicaux Partagés</strong> (constantes, antécédents, historique des consultations).</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-sky-600 dark:text-sky-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Prescription Électronique</strong> d'ordonnances et certificats prêts à imprimer.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-sky-600 dark:text-sky-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Messagerie sécurisée</strong> avec vos patients & réception de bilans médicaux.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-sky-600 dark:text-sky-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Authentification SMS Algérie (+213)</strong> & Email avec sélecteur des 58 Wilayas.</span>
-            </li>
-          </ul>
+          <!-- Card 3 -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/80 hover:border-sky-500 dark:hover:border-sky-500 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-notes-medical"></i>
+              </div>
+              <h3 class="text-lg font-black text-slate-900 dark:text-white mb-2">Carnet de Santé & Sang</h3>
+              <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Gardez votre groupe sanguin (ABO), constantes vitales, allergies et antécédents médicaux toujours sécurisés et accessibles.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-700/60">
+              <a href="patient.html?tab=health-card" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1.5">
+                <span>Ouvrir mon carnet de santé</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </a>
+            </div>
+          </div>
 
-          <!-- CTA Buttons -->
-          <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <a 
-              href="medecin.html" 
-              class="w-full py-4 px-6 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-black text-center text-sm sm:text-base rounded-2xl shadow-xl shadow-sky-600/20 group-hover:shadow-sky-600/30 transition-all flex items-center justify-center gap-3">
-              <i class="fa-solid fa-right-to-bracket text-base"></i>
-              <span>Entrer dans l'Espace Médecin</span>
-              <i class="fa-solid fa-chevron-right text-xs"></i>
-            </a>
-
-            <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-1 font-semibold">
-              <span class="flex items-center gap-1.5">
-                <i class="fa-solid fa-shield-halved text-sky-600"></i>
-                Espace certifié praticiens
-              </span>
-              <a href="medecin.html" class="text-sky-600 dark:text-sky-400 hover:underline">
-                Connexion Praticien &rarr;
+          <!-- Card 4 -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-6 rounded-3xl border border-slate-200 dark:border-slate-700/80 hover:border-indigo-500 dark:hover:border-indigo-500 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl mb-5 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-comments"></i>
+              </div>
+              <h3 class="text-lg font-black text-slate-900 dark:text-white mb-2">Messagerie & Ordonnances</h3>
+              <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Communiquez directement avec votre médecin traitant et téléchargez vos ordonnances et bilans d'analyses en toute confidentialité.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-200/60 dark:border-slate-700/60">
+              <a href="patient.html?tab=chat" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5">
+                <span>Accéder à la messagerie</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </a>
             </div>
           </div>
 
         </div>
-      </div>
 
-      <!-- ==================== CARD 2: PATIENT & FAMILLES ==================== -->
-      <div class="group relative bg-white dark:bg-slate-900 rounded-3xl border-2 border-emerald-100 dark:border-emerald-900/60 hover:border-emerald-500 dark:hover:border-emerald-500 shadow-xl shadow-emerald-500/5 hover:shadow-2xl hover:shadow-emerald-500/15 transition-all duration-300 overflow-hidden flex flex-col justify-between">
-        
-        <!-- Top Gradient Glow Accent -->
-        <div class="h-3 w-full bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600"></div>
-
-        <div class="p-6 sm:p-8 flex-1 flex flex-col">
-          
-          <!-- Badge & Icon -->
-          <div class="flex items-center justify-between mb-6">
-            <span class="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-extrabold uppercase tracking-wider rounded-full border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5">
-              <i class="fa-solid fa-heart-pulse text-emerald-600"></i>
-              Patients & Familles
-            </span>
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/25 group-hover:scale-110 transition-transform">
-              <i class="fa-solid fa-hospital-user"></i>
-            </div>
-          </div>
-
-          <!-- Card Title & Pitch -->
-          <div class="space-y-2 mb-6">
-            <h2 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Espace Patient</span>
-              <i class="fa-solid fa-arrow-right text-emerald-500 text-lg opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"></i>
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-300">
-              Prenez vos rendez-vous médicaux, consultez votre carnet de santé, téléversez vos bilans et discutez avec votre médecin.
+        <!-- Big Banner Patient Direct Access -->
+        <div class="mt-12 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-3xl p-6 sm:p-10 text-white shadow-2xl shadow-emerald-600/20 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div class="space-y-2 text-center md:text-left">
+            <h3 class="text-2xl sm:text-3xl font-black">Prêt à créer votre dossier patient ?</h3>
+            <p class="text-sm sm:text-base text-emerald-50 max-w-xl">
+              Inscription gratuite en 1 minute. Retrouvez vos médecins, vos consultations passées et votre historique de santé.
             </p>
           </div>
-
-          <!-- Feature Bullets -->
-          <ul class="space-y-3 mb-8 flex-1 text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Prise de Rendez-vous 24h/24</strong> : Au cabinet ou en visioconsultation selon votre choix.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Fiche Santé & Groupe Sanguin</strong> : ABO (A, B, AB, O), constantes, calcul d'IMC & allergies.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Téléversement de Documents</strong> : Déposez vos analyses de sang, ordonnances et radiographies.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Discussion en direct avec le Médecin</strong> : Messagerie sécurisée avec pièces jointes.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0"></i>
-              <span><strong>Numéro Carte d'Identité</strong> & suivi dans les 58 Wilayas d'Algérie.</span>
-            </li>
-          </ul>
-
-          <!-- CTA Buttons -->
-          <div class="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
             <a 
               href="patient.html" 
-              class="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white font-black text-center text-sm sm:text-base rounded-2xl shadow-xl shadow-emerald-600/20 group-hover:shadow-emerald-600/30 transition-all flex items-center justify-center gap-3">
-              <i class="fa-solid fa-calendar-check text-base"></i>
-              <span>Entrer dans l'Espace Patient</span>
-              <i class="fa-solid fa-chevron-right text-xs"></i>
+              class="w-full sm:w-auto px-7 py-4 bg-white hover:bg-slate-100 text-emerald-800 font-black text-sm rounded-2xl shadow-lg transition text-center flex items-center justify-center gap-2">
+              <i class="fa-solid fa-hospital-user text-emerald-600"></i>
+              <span>Ouvrir l'Espace Patient</span>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== HOW IT WORKS SECTION (PATIENT) ==================== -->
+    <section id="how-it-works" class="py-14 sm:py-20 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 transition-colors">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto mb-14 space-y-3">
+          <span class="px-3 py-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 text-xs font-extrabold uppercase tracking-wider rounded-full border border-sky-200 dark:border-sky-800">
+            Simple, Rapide & Sécurisé
+          </span>
+          <h2 class="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white">
+            Comment prendre soin de votre santé avec MEDOC ?
+          </h2>
+          <p class="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-medium">
+            3 étapes intuitives pour consulter le praticien de votre choix.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          <!-- Step 1 -->
+          <div class="relative bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm text-center space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl font-black border border-emerald-200 dark:border-emerald-800">
+              1
+            </div>
+            <h3 class="text-xl font-black text-slate-900 dark:text-white">Recherchez un praticien</h3>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Sélectionnez la spécialité médicale, votre wilaya (parmi les 58 wilayas) et découvrez les médecins disponibles.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="relative bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm text-center space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center text-2xl font-black border border-teal-200 dark:border-teal-800">
+              2
+            </div>
+            <h3 class="text-xl font-black text-slate-900 dark:text-white">Choisissez date & heure</h3>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Choisissez le créneau qui vous convient, en présentiel au cabinet ou à distance par visioconsultation.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="relative bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm text-center space-y-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-2xl font-black border border-cyan-200 dark:border-cyan-800">
+              3
+            </div>
+            <h3 class="text-xl font-black text-slate-900 dark:text-white">Consultez et suivez</h3>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Consultez votre soignant, recevez votre ordonnance électronique prête à imprimer et échangez via la messagerie.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         UN PETIT PARTIE DE MÉDECINE (SECTION PRATICIENS / MÉDECINS DÉDIÉE)
+         Discrète, élégante, haut de gamme et non-intrusive
+         ========================================================================= -->
+    <section id="doctor-section" class="py-12 sm:py-16 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white relative overflow-hidden border-t border-slate-800">
+      
+      <!-- Subtle Ambient Glow -->
+      <div class="absolute -right-20 -bottom-20 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+          
+          <!-- Text & Pitch Médecin -->
+          <div class="space-y-4 max-w-2xl text-center lg:text-left">
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-sky-500/20 text-sky-300 text-xs font-extrabold uppercase tracking-wider rounded-full border border-sky-400/30">
+              <i class="fa-solid fa-stethoscope"></i>
+              <span>Vous êtes Professionnel de Santé ?</span>
+            </div>
+
+            <h3 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Espace Médecin & Gestion de Cabinet
+            </h3>
+
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Modernisez votre cabinet médical en Algérie : organisez votre agenda physique & téléconsultation, gérez les dossiers de vos patients, émettez des ordonnances électroniques conformes et échangez en direct avec vos patients.
+            </p>
+
+            <!-- Mini Checklist Features Médecin -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-300 pt-2 font-medium">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-sky-400"></i>
+                <span>Agenda intelligent & gestion salle d'attente</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-sky-400"></i>
+                <span>Dossiers patients & antécédents médicaux</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-sky-400"></i>
+                <span>Ordonnances & certificats PDF prêts à imprimer</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-sky-400"></i>
+                <span>Messagerie sécurisée avec vos patients</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bouton CTA Médecin -->
+          <div class="flex flex-col sm:flex-row lg:flex-col items-center gap-3 w-full lg:w-auto flex-shrink-0">
+            <a 
+              href="medecin.html" 
+              class="w-full sm:w-auto lg:w-64 py-4 px-6 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-black text-center text-sm rounded-2xl shadow-xl shadow-sky-600/30 transition-all flex items-center justify-center gap-3 group cursor-pointer">
+              <i class="fa-solid fa-user-doctor text-base"></i>
+              <span>Entrer dans l'Espace Médecin</span>
+              <i class="fa-solid fa-chevron-right text-xs group-hover:translate-x-1 transition-transform"></i>
             </a>
 
-            <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-1 font-semibold">
-              <span class="flex items-center gap-1.5">
-                <i class="fa-solid fa-lock text-emerald-600"></i>
-                Espace confidentiel sécurisé
-              </span>
-              <a href="patient.html" class="text-emerald-600 dark:text-emerald-400 hover:underline">
-                Accès direct &rarr;
-              </a>
-            </div>
+            <a 
+              href="medecin.html" 
+              class="text-xs text-sky-300 hover:text-white font-semibold underline underline-offset-4 transition">
+              Connexion Praticien & Cabinet &rarr;
+            </a>
           </div>
 
         </div>
       </div>
-
-    </div>
-
-    <!-- ==================== TRUST & FEATURES BAR ==================== -->
-    <div class="mt-14 max-w-5xl mx-auto w-full grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-1 shadow-sm">
-        <i class="fa-solid fa-map-location-dot text-2xl text-sky-600"></i>
-        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">58 Wilayas</h4>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">Couverture nationale</p>
-      </div>
-
-      <div class="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-1 shadow-sm">
-        <i class="fa-solid fa-shield-virus text-2xl text-teal-600"></i>
-        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Données Chiffrées</h4>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">Secret médical garanti</p>
-      </div>
-
-      <div class="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-1 shadow-sm">
-        <i class="fa-solid fa-id-card text-2xl text-emerald-600"></i>
-        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Carte d'Identité</h4>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">Dossier médical certifié</p>
-      </div>
-
-      <div class="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-1 shadow-sm">
-        <i class="fa-solid fa-video text-2xl text-indigo-600"></i>
-        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Téléconsultation</h4>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">Visio HD sécurisée</p>
-      </div>
-    </div>
+    </section>
 
   </main>
 
@@ -329,14 +514,15 @@
         </div>
         <div>
           <span class="font-extrabold text-sm text-blue-600 dark:text-blue-400">MEDOC</span>
-          <span class="text-xs text-slate-500 dark:text-slate-400"> — Plateforme Nationale de Santé en Algérie</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400"> — Portail Patient & Médical National d'Algérie</span>
         </div>
       </div>
 
       <!-- Links -->
       <div class="flex items-center gap-6 text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <a href="patient.html" class="hover:text-emerald-600 transition font-bold text-emerald-600 dark:text-emerald-400">Espace Patient</a>
         <a href="medecin.html" class="hover:text-sky-600 transition">Espace Médecin</a>
-        <a href="patient.html" class="hover:text-emerald-600 transition">Espace Patient</a>
+        <a href="admin.html" class="hover:text-slate-700 dark:hover:text-slate-200 transition">Administration</a>
       </div>
 
       <!-- Copyright -->
@@ -357,7 +543,80 @@
       return {
         darkMode: localStorage.getItem('medidoc_dark_mode') === 'true',
         deferredPrompt: null,
-        canInstall: false
+        canInstall: false,
+        searchQuery: '',
+        selectedWilaya: '',
+        filterTeleconsult: false,
+        popularSpecialties: [
+          { name: 'Médecine Générale', icon: 'fa-solid fa-stethoscope' },
+          { name: 'Pédiatrie', icon: 'fa-solid fa-baby' },
+          { name: 'Cardiologie', icon: 'fa-solid fa-heart-pulse' },
+          { name: 'Gynécologie', icon: 'fa-solid fa-venus' },
+          { name: 'Dermatologie', icon: 'fa-solid fa-hand-dots' },
+          { name: 'Ophtalmologie', icon: 'fa-solid fa-eye' },
+          { name: 'Dentiste', icon: 'fa-solid fa-tooth' },
+          { name: 'Radiologie', icon: 'fa-solid fa-x-ray' }
+        ],
+        wilayas: [
+          { code: '01', name: 'Adrar' },
+          { code: '02', name: 'Chlef' },
+          { code: '03', name: 'Laghouat' },
+          { code: '04', name: 'Oum El Bouaghi' },
+          { code: '05', name: 'Batna' },
+          { code: '06', name: 'Béjaïa' },
+          { code: '07', name: 'Biskra' },
+          { code: '08', name: 'Béchar' },
+          { code: '09', name: 'Blida' },
+          { code: '10', name: 'Bouira' },
+          { code: '11', name: 'Tamanrasset' },
+          { code: '12', name: 'Tébessa' },
+          { code: '13', name: 'Tlemcen' },
+          { code: '14', name: 'Tiaret' },
+          { code: '15', name: 'Tizi Ouzou' },
+          { code: '16', name: 'Alger' },
+          { code: '17', name: 'Djelfa' },
+          { code: '18', name: 'Jijel' },
+          { code: '19', name: 'Sétif' },
+          { code: '20', name: 'Saïda' },
+          { code: '21', name: 'Skikda' },
+          { code: '22', name: 'Sidi Bel Abbès' },
+          { code: '23', name: 'Annaba' },
+          { code: '24', name: 'Guelma' },
+          { code: '25', name: 'Constantine' },
+          { code: '26', name: 'Médéa' },
+          { code: '27', name: 'Mostaganem' },
+          { code: '28', name: "M'Sila" },
+          { code: '29', name: 'Mascara' },
+          { code: '30', name: 'Ouargla' },
+          { code: '31', name: 'Oran' },
+          { code: '32', name: 'El Bayadh' },
+          { code: '33', name: 'Illizi' },
+          { code: '34', name: 'Bordj Bou Arréridj' },
+          { code: '35', name: 'Boumerdès' },
+          { code: '36', name: 'El Tarf' },
+          { code: '37', name: 'Tindouf' },
+          { code: '38', name: 'Tissemsilt' },
+          { code: '39', name: 'El Oued' },
+          { code: '40', name: 'Khenchela' },
+          { code: '41', name: 'Souk Ahras' },
+          { code: '42', name: 'Tipaza' },
+          { code: '43', name: 'Mila' },
+          { code: '44', name: 'Aïn Defla' },
+          { code: '45', name: 'Naâma' },
+          { code: '46', name: 'Aïn Témouchent' },
+          { code: '47', name: 'Ghardaïa' },
+          { code: '48', name: 'Relizane' },
+          { code: '49', name: 'Timimoun' },
+          { code: '50', name: 'Bordj Badji Mokhtar' },
+          { code: '51', name: 'Ouled Djellal' },
+          { code: '52', name: 'Béni Abbès' },
+          { code: '53', name: 'In Salah' },
+          { code: '54', name: 'In Guezzam' },
+          { code: '55', name: 'Touggourt' },
+          { code: '56', name: 'Djanet' },
+          { code: '57', name: "El M'Ghair" },
+          { code: '58', name: 'El Menia' }
+        ]
       };
     },
     mounted() {
@@ -377,6 +636,26 @@
       });
     },
     methods: {
+      performSearch() {
+        const params = new URLSearchParams();
+        params.set('tab', 'doctors');
+        if (this.searchQuery.trim()) {
+          params.set('search', this.searchQuery.trim());
+        }
+        if (this.selectedWilaya) {
+          params.set('wilaya', this.selectedWilaya);
+        }
+        if (this.filterTeleconsult) {
+          params.set('teleconsult', '1');
+        }
+        window.location.href = `patient.html?${params.toString()}`;
+      },
+      searchBySpecialty(specialtyName) {
+        const params = new URLSearchParams();
+        params.set('tab', 'doctors');
+        params.set('specialty', specialtyName);
+        window.location.href = `patient.html?${params.toString()}`;
+      },
       async installPWA() {
         if (!this.deferredPrompt) return;
         this.deferredPrompt.prompt();

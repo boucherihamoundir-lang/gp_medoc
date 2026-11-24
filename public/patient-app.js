@@ -364,6 +364,28 @@ const patientApp = createApp({
         // Charger médecins créés en base
         loadDoctorsDirectory();
 
+        // Paramètres URL (ex: depuis la page d'accueil index.html)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('tab')) {
+          activeTab.value = urlParams.get('tab');
+        }
+        if (urlParams.has('search')) {
+          doctorSearchQuery.value = urlParams.get('search');
+          activeTab.value = 'doctors';
+        }
+        if (urlParams.has('specialty')) {
+          doctorSpecialtyFilter.value = urlParams.get('specialty');
+          activeTab.value = 'doctors';
+        }
+        if (urlParams.has('wilaya')) {
+          doctorWilayaFilter.value = urlParams.get('wilaya');
+          activeTab.value = 'doctors';
+        }
+        if (urlParams.get('teleconsult') === '1' || urlParams.get('teleconsult') === 'true') {
+          doctorTeleconsultFilter.value = true;
+          activeTab.value = 'doctors';
+        }
+
         // Charger rendez-vous
         loadAppointments();
 
