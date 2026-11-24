@@ -54,16 +54,28 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'user_service.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'medoc_users_db'),
-        'USER': os.environ.get('POSTGRES_USER', 'medoc_admin'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'medoc_secure_password_2026'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'postgres'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+# Détection intelligente : Docker (PostgreSQL) vs Développement Local (SQLite prêt à l'emploi)
+IS_DOCKER = os.path.exists('/.dockerenv') or os.environ.get('IS_DOCKER', '').lower() == 'true'
+
+if IS_DOCKER or os.environ.get('USE_POSTGRES', '').lower() == 'true':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'medoc_users_db'),
+            'USER': os.environ.get('POSTGRES_USER', 'medoc_admin'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'medoc_secure_password_2026'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'postgres'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
     }
-}
+else:
+    # Mode Local PC (Fonctionne immédiatement sans installer PostgreSQL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.User'
 

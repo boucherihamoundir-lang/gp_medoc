@@ -58,29 +58,48 @@ TEMPLATES = [
 WSGI_APPLICATION = 'chat_service.wsgi.application'
 ASGI_APPLICATION = 'chat_service.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'medoc_chats_db'),
-        'USER': os.environ.get('POSTGRES_USER', 'medoc_admin'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'medoc_secure_password_2026'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'postgres'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+# Détection intelligente : Docker (PostgreSQL & Redis) vs Développement Local (SQLite & InMemory)
+IS_DOCKER = os.path.exists('/.dockerenv') or os.environ.get('IS_DOCKER', '').lower() == 'true'
+
+if IS_DOCKER or os.environ.get('USE_POSTGRES', '').lower() == 'true':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'medoc_chats_db'),
+            'USER': os.environ.get('POSTGRES_USER', 'medoc_admin'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'medoc_secure_password_2026'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'postgres'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
     }
-}
+else:
+    # Mode Local PC (Fonctionne immédiatement sans installer PostgreSQL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Redis Channel Layer pour Django Channels
 REDIS_HOST = os.environ.get('REDIS_HOST', 'redis')
 REDIS_PORT = os.environ.get('REDIS_PORT', '6379')
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [(REDIS_HOST, int(REDIS_PORT))],
+if IS_DOCKER or os.environ.get('USE_REDIS', '').lower() == 'true':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [(REDIS_HOST, int(REDIS_PORT))],
+            },
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer'
+        }
+    }
 
 LANGUAGE_CODE = 'fr-fr'
 TIME_ZONE = 'Africa/Algiers'
